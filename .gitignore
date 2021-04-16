@@ -1,0 +1,9 @@
+data
+
+### csharp ###
+
+bin
+obj
+appsettings.json
+*.dll
+.vs
