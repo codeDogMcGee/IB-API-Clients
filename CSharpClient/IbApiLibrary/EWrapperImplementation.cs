@@ -1,41 +1,71 @@
-﻿using DataAccessLibrary.Models;
-using IBApi;
+﻿using IBApi;
+using IbApiLibrary.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace ConsoleUI
+namespace IbApiLibrary
 {
     public class EWrapperImplementation : EWrapper
     {
-        private int nextOrderId;
-        private EClientSocket clientSocket;
+        private int _nextOrderId;
+        private EClientSocket _clientSocket;
 
         public readonly EReaderSignal Signal;
 
-        public Dictionary<string, TradesModel> Trades = new Dictionary<string, TradesModel> ();
+        public Dictionary<string, ExecutionsModel> Executions = new Dictionary<string, ExecutionsModel>();
+        internal bool _receivingExecutionsInProgress;
 
         // constructor - initialize class
         public EWrapperImplementation()
         {
             Signal = new EReaderMonitorSignal();
-            clientSocket = new EClientSocket(this, Signal);
+            _clientSocket = new EClientSocket(this, Signal);
         }
 
         public EClientSocket ClientSocket
         {
-            get { return clientSocket; }
-            set { clientSocket = value; }
+            get { return _clientSocket; }
+            set { _clientSocket = value; }
         }
 
         public int NextOrderId
         {
-            get { return nextOrderId; }
-            set { nextOrderId = value; }
+            get { return _nextOrderId; }
+            set { _nextOrderId = value; }
         }
 
         public string BboExchange { get; private set; }
+
+        public virtual void execDetails(int reqId, Contract contract, Execution execution)
+        {
+            ExecutionsModel trade = new ExecutionsModel
+            {
+                Execution = execution,
+                Contract = contract,
+                CommissionReport = new CommissionReport()
+            };
+
+            Executions.Add(execution.ExecId, trade);
+        }
+
+        public virtual void execDetailsEnd(int reqId)
+        {
+            _receivingExecutionsInProgress = false;
+        }
+
+        public virtual void commissionReport(CommissionReport commissionReport)
+        {
+            // get the current trade that has an empty commission report
+            ExecutionsModel trade = Executions[commissionReport.ExecId];
+
+            // update the trade with the commission report
+            trade.CommissionReport = commissionReport;
+
+            // reinsert the trade into the dictionary
+            Executions[commissionReport.ExecId] = trade;
+        }
 
         public virtual void error(Exception e)
         {
@@ -272,35 +302,6 @@ namespace ConsoleUI
         public virtual void contractDetailsEnd(int reqId)
         {
             Console.WriteLine("ContractDetailsEnd. " + reqId + "\n");
-        }
-
-        public virtual void execDetails(int reqId, Contract contract, Execution execution)
-        {
-            TradesModel trade = new TradesModel
-            {
-                Execution = execution,
-                Contract = contract,
-                CommissionReport = new CommissionReport()
-            };
-
-            Trades.Add(execution.ExecId, trade);
-        }
-
-        public virtual void execDetailsEnd(int reqId)
-        {
-            Console.WriteLine("ExecDetailsEnd. " + reqId + "\n");
-        }
-
-        public virtual void commissionReport(CommissionReport commissionReport)
-        {
-            // get the current trade that has an empty commission report
-            TradesModel trade = Trades[commissionReport.ExecId];
-
-            // update the trade with the commission report
-            trade.CommissionReport = commissionReport;
-
-            // reinsert the trade into the dictionary
-            Trades[commissionReport.ExecId] = trade;
         }
 
         public virtual void fundamentalData(int reqId, string data)

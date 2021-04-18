@@ -1,11 +1,8 @@
 ﻿using IBApi;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
-namespace DataAccessLibrary.Models
+namespace IbApiLibrary.Models
 {
-    public class TradesModel
+    public class ExecutionsModel
     {
         public Execution Execution { get; set; }
         public CommissionReport CommissionReport { get; set; }
