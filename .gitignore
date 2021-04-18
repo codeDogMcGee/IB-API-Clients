@@ -1,4 +1,5 @@
 data
+*.log
 
 ### csharp ###
 
@@ -7,3 +8,10 @@ obj
 appsettings.json
 *.dll
 .vs
+
+### python ###
+
+*/ib_api_config.py
+venv
+.idea
+__pycache__
