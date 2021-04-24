@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace ConsoleUI.Models
+namespace CSharpClient.ConsoleUI.Models
 {
     public class ExecutionModel
     {

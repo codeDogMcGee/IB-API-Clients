@@ -1,0 +1,90 @@
+﻿<views:MvxWpfView
+    xmlns:views="clr-namespace:MvvmCross.Platforms.Wpf.Views;assembly=MvvmCross.Platforms.Wpf"
+    xmlns:mvx="clr-namespace:MvvmCross.Platforms.Wpf.Binding;assembly=MvvmCross.Platforms.Wpf"
+    x:Class="CSharpClient.StockContractPicker.Views.ContractPickerView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:CSharpClient.StockContractPicker.Views" 
+    xmlns:viewmodels="clr-namespace:CSharpClient.MvxLibrary.ViewModels;assembly=CSharpClient.MvxLibrary" 
+    d:DataContext="{d:DesignInstance Type=viewmodels:ContractPickerViewModel}"
+    mc:Ignorable="d"  FontSize="20" FontFamily="Helvetica"
+             d:DesignHeight="200" d:DesignWidth="600" Background="#FF130D40" Foreground="Gainsboro">
+    <Grid Margin="10,15,10,10">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="auto"/>
+            <ColumnDefinition Width="auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions >
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto"/>
+            <RowDefinition MinHeight="25" Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition MinHeight="20" Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition MinHeight="20" Height="auto"/>
+            <RowDefinition Height="auto"/>
+            <RowDefinition MinHeight="10" Height="auto"/>
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+
+        <Button Grid.Row="0" Grid.Column="1" x:Name="ConnectIbButton" Padding="10 0 10 0" Content="{Binding ConnectionButtonText}" mvx:Bi.nd="Command ConnectIbCommand"  Background="{DynamicResource {x:Static SystemColors.InactiveBorderBrushKey}}" >
+            <Button.Resources>
+                <Style TargetType="Border">
+                    <Setter Property="CornerRadius" Value="4"/>
+                </Style>
+            </Button.Resources>
+        </Button>
+
+        <TextBlock Grid.Row="0" Grid.Column="2" x:Name="IbConnectionLabel" Padding="5 0 5 0" TextAlignment="Center" Text="{Binding IsConnectedLabel}">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="OrangeRed"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsConnectedToIB}"
+                                     Value="True">
+                            <Setter Property="Foreground" Value="LimeGreen"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <TextBlock Grid.Row="2" Grid.Column="1" MinWidth="250" Padding="0 0 0 0" TextAlignment="Center" Foreground="White">Enter symbol to search:</TextBlock>
+        <TextBox Grid.Row="2" Grid.Column="2" MinWidth="250" x:Name="SearchTextBox" Text="{Binding SearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+        <Button Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2" x:Name="SubmitSearchButton" 
+                Padding="10 0 10 0" Content="Find Matching Symbols" 
+                mvx:Bi.nd="Command SearchForSymbolCommand"
+                Background="{DynamicResource {x:Static SystemColors.InactiveBorderBrushKey}}" IsEnabled="{Binding CanSearchForSymbol}" >
+            <Button.Resources>
+                <Style TargetType="Border">
+                    <Setter Property="CornerRadius" Value="4"/>
+                </Style>
+            </Button.Resources>
+        </Button>
+
+        <DataGrid Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding Stocks}" 
+                  AutoGenerateColumns="False" IsReadOnly="True" SelectedItem="{Binding SelectedStock}"
+                  mvx:Bi.nd="Command ChooseContractCommand">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Symbol" Binding="{Binding Symbol}"/>
+                <DataGridTextColumn Header="MainExchg" Binding="{Binding PrimaryExchange}" />
+                <DataGridTextColumn Header="Currency" Binding="{Binding Currency}" />
+                <DataGridTextColumn Header="SecType" Binding="{Binding SecurityType}"/>
+                <DataGridTextColumn Header="ContractId" Binding="{Binding ContractId}" Width="SizeToCells"/>
+            </DataGrid.Columns>
+            
+            <DataGrid.Resources>
+                <Style TargetType="Border">
+                    <Setter Property="CornerRadius" Value="2"/>
+                </Style>
+            </DataGrid.Resources>
+        </DataGrid>
+
+
+    </Grid>
+</views:MvxWpfView>

@@ -1,28 +1,29 @@
 ﻿using IBApi;
-using IbApiLibrary.Models;
+using CsharpClient.IbApiLibrary.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace IbApiLibrary
+namespace CsharpClient.IbApiLibrary
 {
     public class EWrapperImplementation : EWrapper
     {
         private int _nextOrderId;
         private EClientSocket _clientSocket;
 
-        public readonly EReaderSignal Signal;
+        internal readonly EReaderSignal _signal;
 
-        public Dictionary<string, ExecutionsModel> Executions = new Dictionary<string, ExecutionsModel>();
+        internal readonly Dictionary<string, int> _reqIdMap = new Dictionary<string, int> 
+        {
+            { "GetAllExecutions", 20001 },
+            { "GetMatchingStockSymbolsFromIB", 20002 }
+        };
+
+        internal Dictionary<string, ExecutionsModel> _executions = new Dictionary<string, ExecutionsModel>();
         internal bool _receivingExecutionsInProgress;
 
-        // constructor - initialize class
-        public EWrapperImplementation()
-        {
-            Signal = new EReaderMonitorSignal();
-            _clientSocket = new EClientSocket(this, Signal);
-        }
+        public List<StockContractModel> Stocks = new List<StockContractModel>();
 
         public EClientSocket ClientSocket
         {
@@ -38,165 +39,211 @@ namespace IbApiLibrary
 
         public string BboExchange { get; private set; }
 
-        public virtual void execDetails(int reqId, Contract contract, Execution execution)
+        // constructor - initialize class
+        public EWrapperImplementation()
         {
-            ExecutionsModel trade = new ExecutionsModel
+            _signal = new EReaderMonitorSignal();
+            _clientSocket = new EClientSocket(this, _signal);
+        }
+
+        public void execDetails(int reqId, Contract contract, Execution execution)
+        {
+            if (reqId == _reqIdMap["GetAllExecutions"])
             {
-                Execution = execution,
-                Contract = contract,
-                CommissionReport = new CommissionReport()
-            };
+                ExecutionsModel trade = new ExecutionsModel
+                {
+                    Execution = execution,
+                    Contract = contract,
+                    CommissionReport = new CommissionReport()
+                };
 
-            Executions.Add(execution.ExecId, trade);
+                _executions.Add(execution.ExecId, trade);
+            }
         }
 
-        public virtual void execDetailsEnd(int reqId)
+        public void execDetailsEnd(int reqId)
         {
-            _receivingExecutionsInProgress = false;
+            if (reqId == _reqIdMap["GetAllExecutions"])
+            {
+                _receivingExecutionsInProgress = false;
+            }
         }
 
-        public virtual void commissionReport(CommissionReport commissionReport)
+        public void commissionReport(CommissionReport commissionReport)
         {
-            // get the current trade that has an empty commission report
-            ExecutionsModel trade = Executions[commissionReport.ExecId];
+            if (_executions.Keys.Contains<string>(commissionReport.ExecId))
+            {
+                // get the current trade that has an empty commission report
+                ExecutionsModel trade = _executions[commissionReport.ExecId];
 
-            // update the trade with the commission report
-            trade.CommissionReport = commissionReport;
+                // update the trade with the commission report
+                trade.CommissionReport = commissionReport;
 
-            // reinsert the trade into the dictionary
-            Executions[commissionReport.ExecId] = trade;
+                // reinsert the trade into the dictionary
+                _executions[commissionReport.ExecId] = trade;
+            }
+
         }
 
-        public virtual void error(Exception e)
+        public void symbolSamples(int reqId, ContractDescription[] contractDescriptions)
+        {
+            // more detail available at https://interactivebrokers.github.io/tws-api/matching_symbols.html
+            // this method starts out pretty simple
+
+            if (reqId == _reqIdMap["GetMatchingStockSymbolsFromIB"])
+            {
+                foreach (var contractDescription in contractDescriptions)
+                {
+                    if (contractDescription.Contract.SecType == "STK")
+                    {
+                        StockContractModel stock = new StockContractModel
+                        {
+                            ContractId = contractDescription.Contract.ConId,
+                            Symbol = contractDescription.Contract.Symbol,
+                            SecurityType = contractDescription.Contract.SecType,
+                            Exchange = contractDescription.Contract.Exchange,
+                            Currency = contractDescription.Contract.Currency,
+                            PrimaryExchange = contractDescription.Contract.PrimaryExch
+                        };
+
+                        Stocks.Add(stock);
+                    }
+                }
+            }
+
+           
+        }
+
+        public void error(Exception e)
         {
             Console.WriteLine("Exception thrown: " + e);
             throw e;
         }
 
-        public virtual void error(string str)
+        public void error(string str)
         {
             Console.WriteLine("Error: " + str + "\n");
         }
 
-        public virtual void error(int id, int errorCode, string errorMsg)
+        public void error(int id, int errorCode, string errorMsg)
         {
             Console.WriteLine("Error. Id: " + id + ", Code: " + errorCode + ", Msg: " + errorMsg + "\n");
         }
 
-        public virtual void connectionClosed()
+        public void connectionClosed()
         {
             Console.WriteLine("Connection closed.\n");
         }
 
-        public virtual void currentTime(long time)
+        public void currentTime(long time)
         {
             Console.WriteLine("Current Time: " + time + "\n");
         }
 
-        public virtual void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
+        public void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
         {
             Console.WriteLine("Tick Price. Ticker Id:" + tickerId + ", Field: " + field + ", Price: " + price + ", CanAutoExecute: " + attribs.CanAutoExecute +
                 ", PastLimit: " + attribs.PastLimit + ", PreOpen: " + attribs.PreOpen);
         }
 
-        public virtual void tickSize(int tickerId, int field, int size)
+        public void tickSize(int tickerId, int field, int size)
         {
             Console.WriteLine("Tick Size. Ticker Id:" + tickerId + ", Field: " + field + ", Size: " + size);
         }
 
-        public virtual void tickString(int tickerId, int tickType, string value)
+        public void tickString(int tickerId, int tickType, string value)
         {
             Console.WriteLine("Tick string. Ticker Id:" + tickerId + ", Type: " + tickType + ", Value: " + value);
         }
 
-        public virtual void tickGeneric(int tickerId, int field, double value)
+        public void tickGeneric(int tickerId, int field, double value)
         {
             Console.WriteLine("Tick Generic. Ticker Id:" + tickerId + ", Field: " + field + ", Value: " + value);
         }
 
-        public virtual void tickEFP(int tickerId, int tickType, double basisPoints, string formattedBasisPoints, double impliedFuture, int holdDays, string futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate)
+        public void tickEFP(int tickerId, int tickType, double basisPoints, string formattedBasisPoints, double impliedFuture, int holdDays, string futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate)
         {
             Console.WriteLine("TickEFP. " + tickerId + ", Type: " + tickType + ", BasisPoints: " + basisPoints + ", FormattedBasisPoints: " + formattedBasisPoints + ", ImpliedFuture: " + impliedFuture + ", HoldDays: " + holdDays + ", FutureLastTradeDate: " + futureLastTradeDate + ", DividendImpact: " + dividendImpact + ", DividendsToLastTradeDate: " + dividendsToLastTradeDate);
         }
 
-        public virtual void tickSnapshotEnd(int tickerId)
+        public void tickSnapshotEnd(int tickerId)
         {
             Console.WriteLine("TickSnapshotEnd: " + tickerId);
         }
 
-        public virtual void nextValidId(int orderId)
+        public void nextValidId(int orderId)
         {
             Console.WriteLine("Next Valid Id: " + orderId);
             NextOrderId = orderId;
         }
 
-        public virtual void deltaNeutralValidation(int reqId, DeltaNeutralContract deltaNeutralContract)
+        public void deltaNeutralValidation(int reqId, DeltaNeutralContract deltaNeutralContract)
         {
             Console.WriteLine("DeltaNeutralValidation. " + reqId + ", ConId: " + deltaNeutralContract.ConId + ", Delta: " + deltaNeutralContract.Delta + ", Price: " + deltaNeutralContract.Price);
         }
 
-        public virtual void managedAccounts(string accountsList)
+        public void managedAccounts(string accountsList)
         {
             Console.WriteLine("Account list: " + accountsList);
         }
 
-        public virtual void tickOptionComputation(int tickerId, int field, double impliedVolatility, double delta, double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice)
+        public void tickOptionComputation(int tickerId, int field, double impliedVolatility, double delta, double optPrice, double pvDividend, double gamma, double vega, double theta, double undPrice)
         {
             Console.WriteLine("TickOptionComputation. TickerId: " + tickerId + ", field: " + field + ", ImpliedVolatility: " + impliedVolatility + ", Delta: " + delta
                 + ", OptionPrice: " + optPrice + ", pvDividend: " + pvDividend + ", Gamma: " + gamma + ", Vega: " + vega + ", Theta: " + theta + ", UnderlyingPrice: " + undPrice);
         }
 
-        public virtual void accountSummary(int reqId, string account, string tag, string value, string currency)
+        public void accountSummary(int reqId, string account, string tag, string value, string currency)
         {
             Console.WriteLine("Acct Summary. ReqId: " + reqId + ", Acct: " + account + ", Tag: " + tag + ", Value: " + value + ", Currency: " + currency);
         }
 
-        public virtual void accountSummaryEnd(int reqId)
+        public void accountSummaryEnd(int reqId)
         {
             Console.WriteLine("AccountSummaryEnd. Req Id: " + reqId + "\n");
         }
 
-        public virtual void updateAccountValue(string key, string value, string currency, string accountName)
+        public void updateAccountValue(string key, string value, string currency, string accountName)
         {
             Console.WriteLine("UpdateAccountValue. Key: " + key + ", Value: " + value + ", Currency: " + currency + ", AccountName: " + accountName);
         }
 
-        public virtual void updatePortfolio(Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
+        public void updatePortfolio(Contract contract, double position, double marketPrice, double marketValue, double averageCost, double unrealizedPNL, double realizedPNL, string accountName)
         {
             Console.WriteLine("UpdatePortfolio. " + contract.Symbol + ", " + contract.SecType + " @ " + contract.Exchange
                 + ": Position: " + position + ", MarketPrice: " + marketPrice + ", MarketValue: " + marketValue + ", AverageCost: " + averageCost
                 + ", UnrealizedPNL: " + unrealizedPNL + ", RealizedPNL: " + realizedPNL + ", AccountName: " + accountName);
         }
 
-        public virtual void updateAccountTime(string timestamp)
+        public void updateAccountTime(string timestamp)
         {
             Console.WriteLine("UpdateAccountTime. Time: " + timestamp + "\n");
         }
 
-        public virtual void accountDownloadEnd(string account)
+        public void accountDownloadEnd(string account)
         {
             Console.WriteLine("Account download finished: " + account + "\n");
         }
 
-        public virtual void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
+        public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
             Console.WriteLine("OrderStatus. Id: " + orderId + ", Status: " + status + ", Filled: " + filled + ", Remaining: " + remaining
                 + ", AvgFillPrice: " + avgFillPrice + ", PermId: " + permId + ", ParentId: " + parentId + ", LastFillPrice: " + lastFillPrice + ", ClientId: " + clientId + ", WhyHeld: " + whyHeld + ", MktCapPrice: " + mktCapPrice);
         }
 
-        public virtual void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
+        public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
         {
             Console.WriteLine("OpenOrder. PermID: " + order.PermId + ", ClientId: " + order.ClientId + ", OrderId: " + orderId + ", Account: " + order.Account +
                 ", Symbol: " + contract.Symbol + ", SecType: " + contract.SecType + " , Exchange: " + contract.Exchange + ", Action: " + order.Action + ", OrderType: " + order.OrderType +
                 ", TotalQty: " + order.TotalQuantity + ", CashQty: " + order.CashQty + ", LmtPrice: " + order.LmtPrice + ", AuxPrice: " + order.AuxPrice + ", Status: " + orderState.Status);
         }
 
-        public virtual void openOrderEnd()
+        public void openOrderEnd()
         {
             Console.WriteLine("OpenOrderEnd");
         }
 
-        public virtual void contractDetails(int reqId, ContractDetails contractDetails)
+        public void contractDetails(int reqId, ContractDetails contractDetails)
         {
             Console.WriteLine("ContractDetails begin. ReqId: " + reqId);
             printContractMsg(contractDetails.Contract);
@@ -299,135 +346,135 @@ namespace IbApiLibrary
             printContractDetailsSecIdList(contractDetails.SecIdList);
         }
 
-        public virtual void contractDetailsEnd(int reqId)
+        public void contractDetailsEnd(int reqId)
         {
             Console.WriteLine("ContractDetailsEnd. " + reqId + "\n");
         }
 
-        public virtual void fundamentalData(int reqId, string data)
+        public void fundamentalData(int reqId, string data)
         {
             Console.WriteLine("FundamentalData. " + reqId + "" + data + "\n");
         }
 
-        public virtual void historicalData(int reqId, Bar bar)
+        public void historicalData(int reqId, Bar bar)
         {
             Console.WriteLine("HistoricalData. " + reqId + " - Time: " + bar.Time + ", Open: " + bar.Open + ", High: " + bar.High + ", Low: " + bar.Low + ", Close: " + bar.Close + ", Volume: " + bar.Volume + ", Count: " + bar.Count + ", WAP: " + bar.WAP);
         }
 
-        public virtual void marketDataType(int reqId, int marketDataType)
+        public void marketDataType(int reqId, int marketDataType)
         {
             Console.WriteLine("MarketDataType. " + reqId + ", Type: " + marketDataType + "\n");
         }
 
-        public virtual void updateMktDepth(int tickerId, int position, int operation, int side, double price, int size)
+        public void updateMktDepth(int tickerId, int position, int operation, int side, double price, int size)
         {
             Console.WriteLine("UpdateMarketDepth. " + tickerId + " - Position: " + position + ", Operation: " + operation + ", Side: " + side + ", Price: " + price + ", Size: " + size);
         }
 
-        public virtual void updateMktDepthL2(int tickerId, int position, string marketMaker, int operation, int side, double price, int size, bool isSmartDepth)
+        public void updateMktDepthL2(int tickerId, int position, string marketMaker, int operation, int side, double price, int size, bool isSmartDepth)
         {
             Console.WriteLine("UpdateMarketDepthL2. " + tickerId + " - Position: " + position + ", Operation: " + operation + ", Side: " + side + ", Price: " + price + ", Size: " + size + ", isSmartDepth: " + isSmartDepth);
         }
 
-        public virtual void updateNewsBulletin(int msgId, int msgType, String message, String origExchange)
+        public void updateNewsBulletin(int msgId, int msgType, String message, String origExchange)
         {
             Console.WriteLine("News Bulletins. " + msgId + " - Type: " + msgType + ", Message: " + message + ", Exchange of Origin: " + origExchange + "\n");
         }
 
-        public virtual void position(string account, Contract contract, double pos, double avgCost)
+        public void position(string account, Contract contract, double pos, double avgCost)
         {
             Console.WriteLine("Position. " + account + " - Symbol: " + contract.Symbol + ", SecType: " + contract.SecType + ", Currency: " + contract.Currency + ", Position: " + pos + ", Avg cost: " + avgCost);
         }
 
-        public virtual void positionEnd()
+        public void positionEnd()
         {
             Console.WriteLine("PositionEnd \n");
         }
 
-        public virtual void realtimeBar(int reqId, long time, double open, double high, double low, double close, long volume, double WAP, int count)
+        public void realtimeBar(int reqId, long time, double open, double high, double low, double close, long volume, double WAP, int count)
         {
             Console.WriteLine("RealTimeBars. " + reqId + " - Time: " + time + ", Open: " + open + ", High: " + high + ", Low: " + low + ", Close: " + close + ", Volume: " + volume + ", Count: " + count + ", WAP: " + WAP);
         }
 
-        public virtual void scannerParameters(string xml)
+        public void scannerParameters(string xml)
         {
             Console.WriteLine("ScannerParameters. " + xml + "\n");
         }
 
-        public virtual void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
+        public void scannerData(int reqId, int rank, ContractDetails contractDetails, string distance, string benchmark, string projection, string legsStr)
         {
             Console.WriteLine("ScannerData. " + reqId + " - Rank: " + rank + ", Symbol: " + contractDetails.Contract.Symbol + ", SecType: " + contractDetails.Contract.SecType + ", Currency: " + contractDetails.Contract.Currency
                 + ", Distance: " + distance + ", Benchmark: " + benchmark + ", Projection: " + projection + ", Legs String: " + legsStr);
         }
 
-        public virtual void scannerDataEnd(int reqId)
+        public void scannerDataEnd(int reqId)
         {
             Console.WriteLine("ScannerDataEnd. " + reqId);
         }
 
-        public virtual void receiveFA(int faDataType, string faXmlData)
+        public void receiveFA(int faDataType, string faXmlData)
         {
             Console.WriteLine("Receing FA: " + faDataType + " - " + faXmlData);
         }
 
-        public virtual void bondContractDetails(int requestId, ContractDetails contractDetails)
+        public void bondContractDetails(int requestId, ContractDetails contractDetails)
         {
             Console.WriteLine("BondContractDetails begin. ReqId: " + requestId);
             printBondContractDetailsMsg(contractDetails);
             Console.WriteLine("BondContractDetails end. ReqId: " + requestId);
         }
 
-        public virtual void historicalDataEnd(int reqId, string startDate, string endDate)
+        public void historicalDataEnd(int reqId, string startDate, string endDate)
         {
             Console.WriteLine("HistoricalDataEnd - " + reqId + " from " + startDate + " to " + endDate);
         }
 
-        public virtual void verifyMessageAPI(string apiData)
+        public void verifyMessageAPI(string apiData)
         {
             Console.WriteLine("verifyMessageAPI: " + apiData);
         }
 
-        public virtual void verifyCompleted(bool isSuccessful, string errorText)
+        public void verifyCompleted(bool isSuccessful, string errorText)
         {
             Console.WriteLine("verifyCompleted. IsSuccessfule: " + isSuccessful + " - Error: " + errorText);
         }
 
-        public virtual void verifyAndAuthMessageAPI(string apiData, string xyzChallenge)
+        public void verifyAndAuthMessageAPI(string apiData, string xyzChallenge)
         {
             Console.WriteLine("verifyAndAuthMessageAPI: " + apiData + " " + xyzChallenge);
         }
 
-        public virtual void verifyAndAuthCompleted(bool isSuccessful, string errorText)
+        public void verifyAndAuthCompleted(bool isSuccessful, string errorText)
         {
             Console.WriteLine("verifyAndAuthCompleted. IsSuccessful: " + isSuccessful + " - Error: " + errorText);
         }
 
-        public virtual void displayGroupList(int reqId, string groups)
+        public void displayGroupList(int reqId, string groups)
         {
             Console.WriteLine("DisplayGroupList. Request: " + reqId + ", Groups" + groups);
         }
 
-        public virtual void displayGroupUpdated(int reqId, string contractInfo)
+        public void displayGroupUpdated(int reqId, string contractInfo)
         {
             Console.WriteLine("displayGroupUpdated. Request: " + reqId + ", ContractInfo: " + contractInfo);
         }
 
-        public virtual void positionMulti(int reqId, string account, string modelCode, Contract contract, double pos, double avgCost)
+        public void positionMulti(int reqId, string account, string modelCode, Contract contract, double pos, double avgCost)
         {
             Console.WriteLine("Position Multi. Request: " + reqId + ", Account: " + account + ", ModelCode: " + modelCode + ", Symbol: " + contract.Symbol + ", SecType: " + contract.SecType + ", Currency: " + contract.Currency + ", Position: " + pos + ", Avg cost: " + avgCost + "\n");
         }
 
-        public virtual void positionMultiEnd(int reqId)
+        public void positionMultiEnd(int reqId)
         {
             Console.WriteLine("Position Multi End. Request: " + reqId + "\n");
         }
 
-        public virtual void accountUpdateMulti(int reqId, string account, string modelCode, string key, string value, string currency)
+        public void accountUpdateMulti(int reqId, string account, string modelCode, string key, string value, string currency)
         {
             Console.WriteLine("Account Update Multi. Request: " + reqId + ", Account: " + account + ", ModelCode: " + modelCode + ", Key: " + key + ", Value: " + value + ", Currency: " + currency + "\n");
         }
 
-        public virtual void accountUpdateMultiEnd(int reqId)
+        public void accountUpdateMultiEnd(int reqId)
         {
             Console.WriteLine("Account Update Multi End. Request: " + reqId + "\n");
         }
@@ -466,25 +513,6 @@ namespace IbApiLibrary
             foreach (var familyCode in familyCodes)
             {
                 Console.WriteLine("Account ID: {0}, Family Code Str: {1}", familyCode.AccountID, familyCode.FamilyCodeStr);
-            }
-        }
-
-        public void symbolSamples(int reqId, ContractDescription[] contractDescriptions)
-        {
-            string derivSecTypes;
-            Console.WriteLine("Symbol Samples. Request Id: {0}", reqId);
-
-            foreach (var contractDescription in contractDescriptions)
-            {
-                derivSecTypes = "";
-                foreach (var derivSecType in contractDescription.DerivativeSecTypes)
-                {
-                    derivSecTypes += derivSecType;
-                    derivSecTypes += " ";
-                }
-                Console.WriteLine("Contract: conId - {0}, symbol - {1}, secType - {2}, primExchange - {3}, currency - {4}, derivativeSecTypes - {5}",
-                    contractDescription.Contract.ConId, contractDescription.Contract.Symbol, contractDescription.Contract.SecType,
-                    contractDescription.Contract.PrimaryExch, contractDescription.Contract.Currency, derivSecTypes);
             }
         }
 
@@ -658,7 +686,7 @@ namespace IbApiLibrary
             Console.WriteLine("Order bound. Order Id: {0}, Api Client Id: {1}, Api Order Id: {2}", orderId, apiClientId, apiOrderId);
         }
 
-        public virtual void completedOrder(Contract contract, Order order, OrderState orderState)
+        public void completedOrder(Contract contract, Order order, OrderState orderState)
         {
             Console.WriteLine("CompletedOrder. PermID: " + order.PermId + ", ParentPermId: " + Util.LongMaxString(order.ParentPermId) + ", Account: " + order.Account + ", Symbol: " + contract.Symbol + ", SecType: " + contract.SecType +
                 " , Exchange: " + contract.Exchange + ", Action: " + order.Action + ", OrderType: " + order.OrderType + ", TotalQty: " + order.TotalQuantity +
@@ -666,7 +694,7 @@ namespace IbApiLibrary
                 ", CompletedTime: " + orderState.CompletedTime + ", CompletedStatus: " + orderState.CompletedStatus);
         }
 
-        public virtual void completedOrdersEnd()
+        public void completedOrdersEnd()
         {
             Console.WriteLine("CompletedOrdersEnd");
         }

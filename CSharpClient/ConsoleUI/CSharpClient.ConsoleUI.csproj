@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
+    <RootNamespace>CSharpClient.ConsoleUI</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -10,7 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\IbApiLibrary\IbApiLibrary.csproj" />
+    <ProjectReference Include="..\IbApiLibrary\CSharpClient.IbApiLibrary.csproj" />
   </ItemGroup>
 
 </Project>

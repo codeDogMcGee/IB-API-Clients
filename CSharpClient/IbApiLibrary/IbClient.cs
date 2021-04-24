@@ -1,5 +1,5 @@
 ﻿using IBApi;
-using IbApiLibrary.Models;
+using CsharpClient.IbApiLibrary.Models;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using System;
@@ -10,7 +10,7 @@ using System.Reflection;
 using System.Text;
 using System.Threading;
 
-namespace IbApiLibrary
+namespace CsharpClient.IbApiLibrary
 {
     public class IbClient
     {
@@ -26,20 +26,44 @@ namespace IbApiLibrary
 
             _ibConnection = new EWrapperImplementation();
             _clientSocket = _ibConnection.ClientSocket;
-            _readerSignal = _ibConnection.Signal;
+            _readerSignal = _ibConnection._signal;
          
 
+        }
+
+        public string GetMatchingStockSymbolsFromIB(string patternToMatch)
+        {
+            _clientSocket.reqMatchingSymbols(
+                _ibConnection._reqIdMap["GetMatchingStockSymbolsFromIB"], 
+                patternToMatch);
+
+            List<StockContractModel> stocks = new List<StockContractModel>();
+
+            // reqMatchingSymbols doesn't tell you when it's done
+            // so wait a couple seconds and then see if there are results
+            while (stocks.Count == 0)
+            {
+                Thread.Sleep(1000);
+                stocks = _ibConnection.Stocks;
+
+                // after retreiving the stocks from the Wrapper clear the Wrapper list
+                _ibConnection.Stocks = new List<StockContractModel>();
+            }
+
+            return JsonConvert.SerializeObject(stocks);
         }
 
         public string GetAllExecutions()
         {
             _ibConnection._receivingExecutionsInProgress = true;
-            _clientSocket.reqExecutions(10001, new ExecutionFilter());
+            _clientSocket.reqExecutions(
+                _ibConnection._reqIdMap["GetAllExecutions"],
+                new ExecutionFilter());
 
             while (_ibConnection._receivingExecutionsInProgress) { }  // wait for the receive exeutions to finish before proceeding
 
             List<Dictionary<string, string>> output = new List<Dictionary<string, string>>();
-            foreach (var execution in _ibConnection.Executions)
+            foreach (var execution in _ibConnection._executions)
             {
                 output.Add(ExecutionsModelToDictionary(execution.Value));
             }
@@ -87,7 +111,7 @@ namespace IbApiLibrary
 
         private static void WaitForIbToConnect()
         {
-            // One (although primitive) way of knowing if we can proceed is by monitoring the order's nextValidId reception which comes down automatically after connecting.
+            // monitor the order's nextValidId reception which comes down automatically after connecting.
             while (_ibConnection.NextOrderId <= 0) { }
         }
 
