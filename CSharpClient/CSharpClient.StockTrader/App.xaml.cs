@@ -2,7 +2,7 @@
 using MvvmCross.Platforms.Wpf.Core;
 using MvvmCross.Platforms.Wpf.Views;
 
-namespace CSharpClient.StockContractPicker
+namespace CSharpClient.StockTrader
 {
     /// <summary>
     /// Interaction logic for App.xaml

@@ -1,6 +1,7 @@
 ﻿using CsharpClient.IbApiLibrary;
 using CSharpClient.MvxLibrary.Models;
 using MvvmCross.Commands;
+using MvvmCross.Navigation;
 using MvvmCross.ViewModels;
 using Newtonsoft.Json;
 using System;
@@ -10,37 +11,38 @@ using System.Text;
 
 namespace CSharpClient.MvxLibrary.ViewModels
 {
-    public class ContractPickerViewModel : MvxViewModel
+    public class ContractPickerViewModel : MvxViewModel<NavigationArgs>
     {
         private IbClient _ibClient;
-        public ContractPickerViewModel()
+        private readonly IMvxNavigationService _navigationService;
+        private StockContractModel _selectedContract = new StockContractModel();
+        private ObservableCollection<StockLineItemModel> _mainPageStocks;
+
+        public ContractPickerViewModel(IMvxNavigationService navigationService)
         {
-            ConnectIbCommand = new MvxCommand(ConnectToIb);
             SearchForSymbolCommand = new MvxCommand(SearchForSymbol);
-            //ChooseContractCommand = new MvxCommand(ChooseContract);
+            ContractExchangeCommand = new MvxCommand(ToggleUserExchangeChoice);
+
+            _navigationService = navigationService;
+            NavigateHomeCommand = new MvxCommand(() => _navigationService.Navigate<StockTraderViewModel, NavigationArgs>(
+                new NavigationArgs
+                {
+                    LastUserSelectedContract = _selectedContract,
+                    IbClientIsConnected = true,
+                    IbClient = _ibClient,
+                    StockRowList = _mainPageStocks
+                })
+            );
         }
 
-        public IMvxCommand ConnectIbCommand { get; set; }
-        public IMvxCommand SearchForSymbolCommand { get; set; }
-        //public IMvxCommand ChooseContractCommand { get; set; }
+        public IMvxCommand SearchForSymbolCommand { get; private set; }
+        public IMvxCommand ContractExchangeCommand { get; private set; }
+        public IMvxCommand NavigateHomeCommand { get; private set; }
 
-        private void ConnectToIb()
-        {
-            if (IsConnectedToIB)
-            {
-                _ibClient.DisconnectIbSocket();
-                _ibClient = null;
+        private bool _userExchangeIsSmart = true;
+        private bool _contractRowIsSelected;
+        private StockContractModel _selectedStock;
 
-                IsConnectedToIB = false;
-            }
-            else
-            {
-                _ibClient = new IbClient();
-                _ibClient.ConnectToIb();
-                
-                IsConnectedToIB = true;
-            }
-        }
 
         private void SearchForSymbol()
         {
@@ -53,54 +55,55 @@ namespace CSharpClient.MvxLibrary.ViewModels
             {
                 Stocks.Add(stock);
             }
+
+            SymbolTableVisibility = "Visible";
         }
 
-        private StockContractModel _selectedStock;
+        private void ToggleUserExchangeChoice()
+        {
+            if (_userExchangeIsSmart)
+            {
+                _userExchangeIsSmart = false;
+            }
+            else
+            {
+                _userExchangeIsSmart = true;
+            }
+        }
 
         public StockContractModel SelectedStock
         {
             get => _selectedStock;
-            set 
-            { 
+            set
+            {
                 _selectedStock = value;
                 if (value != null)
                 {
-                    DoSomethingWhenStockSelected();
+                    DoSomethingWhenStockSelected(value);
                 }
-                
+
             }
         }
 
-        private void DoSomethingWhenStockSelected()
+        private void DoSomethingWhenStockSelected(StockContractModel userSelectedContract)
         {
-            throw new NotImplementedException("DoSomethingWhenStockSelected() not yet implemented.");
+            userSelectedContract.Exchange = _userExchangeIsSmart ? "SMART" : userSelectedContract.PrimaryExchange;
+            _selectedContract = userSelectedContract;
+
+            NavigateHomeCommand.Execute();
         }
 
-        private bool _isConnectedToIB = false;
-
-        public bool IsConnectedToIB
+        public override void Prepare(NavigationArgs parameter)
         {
-            get => _isConnectedToIB;
-            set
-            {
-                SetProperty(ref _isConnectedToIB, value);
-            }
+            _ibClient = parameter.IbClient;
+            _mainPageStocks = parameter.StockRowList;
         }
-
-        private bool _contractRowIsSelected;
 
         public bool ContractRowIsSelected
         {
             get => _contractRowIsSelected;
-            set
-            {
-                SetProperty(ref _contractRowIsSelected, value);
-            }
+            set { SetProperty(ref _contractRowIsSelected, value); }
         }
-
-
-        public string IsConnectedLabel { get => _isConnectedToIB ? "Connected" : "Disconnected"; }
-        public string ConnectionButtonText { get => _isConnectedToIB ? "Disconnect IB" : "Connect IB"; }
 
         private string _searchText = "";
 
@@ -109,12 +112,19 @@ namespace CSharpClient.MvxLibrary.ViewModels
             get => _searchText;
             set
             {
-              SetProperty(ref _searchText, value);
+                SetProperty(ref _searchText, value);
                 RaisePropertyChanged(() => CanSearchForSymbol);
             }
         }
 
-        public bool CanSearchForSymbol => IsConnectedToIB is true && string.IsNullOrWhiteSpace(SearchText) is false;  // add no blank values passed
+        public bool CanSearchForSymbol => string.IsNullOrWhiteSpace(SearchText) is false;
+
+        private string _symbolTableVisibility = "Hidden";
+        public string SymbolTableVisibility
+        {
+            get => _symbolTableVisibility;
+            set { SetProperty(ref _symbolTableVisibility, value); }
+        }
 
         private ObservableCollection<StockContractModel> _stocks = new ObservableCollection<StockContractModel>();
 
