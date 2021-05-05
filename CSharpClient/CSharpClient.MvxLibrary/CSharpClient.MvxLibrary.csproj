@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CSharpClient.IbApiLibrary\CSharpClient.IbApiLibrary.csproj" />
     <ProjectReference Include="..\IbApiLibrary\CSharpClient.IbApiLibrary.csproj" />
   </ItemGroup>
 

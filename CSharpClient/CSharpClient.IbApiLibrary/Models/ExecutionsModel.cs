@@ -1,6 +1,6 @@
 ﻿using IBApi;
 
-namespace CsharpClient.IbApiLibrary.Models
+namespace CSharpClient.IbApiLibrary.Models
 {
     public class ExecutionsModel
     {

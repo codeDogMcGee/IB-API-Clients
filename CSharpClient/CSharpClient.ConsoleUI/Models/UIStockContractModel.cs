@@ -2,7 +2,7 @@
 
 namespace CSharpClient.ConsoleUI.Models
 {
-    public class StockContractModel
+    public class UIStockContractModel
     {
         public int ContractId { get; set; }
         public string Symbol { get; set; }

@@ -11,6 +11,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CSharpClient.IbApiLibrary\CSharpClient.IbApiLibrary.csproj" />
+    <ProjectReference Include="..\CSharpClient.MvxLibrary\CSharpClient.MvxLibrary.csproj" />
     <ProjectReference Include="..\IbApiLibrary\CSharpClient.IbApiLibrary.csproj" />
   </ItemGroup>
 

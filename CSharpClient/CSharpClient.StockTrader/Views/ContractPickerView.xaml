@@ -54,7 +54,7 @@
             <RadioButton Content="Primary Exchange" Foreground="White" Margin="50 0 0 0" mvx:Bi.nd="Command ContractExchangeCommand"/>
         </StackPanel>
 
-        <DataGrid Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding Stocks}" 
+        <DataGrid Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="2" ItemsSource="{Binding SearchResultsStocks}" 
                   AutoGenerateColumns="False" IsReadOnly="True" SelectedItem="{Binding SelectedStock}"
                   mvx:Bi.nd="Command ChooseContractCommand" Visibility="{Binding SymbolTableVisibility}">
             <DataGrid.Columns>

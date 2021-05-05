@@ -1,6 +1,8 @@
-﻿namespace CsharpClient.IbApiLibrary.Models
+﻿using CSharpClient.IbApiLibrary.Interfaces;
+
+namespace CSharpClient.IbApiLibrary.Models
 {
-    public class StockContractModel
+    public class StockContractModel : IStockContractModel
     {
         public int ContractId { get; set; }
         public string Symbol { get; set; }

@@ -1,5 +1,5 @@
-﻿using IBApi;
-using CsharpClient.IbApiLibrary.Models;
+﻿using CSharpClient.IbApiLibrary.Models;
+using IBApi;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,6 +19,8 @@ namespace CsharpClient.IbApiLibrary
             { "GetAllExecutions", 20001 },
             { "GetMatchingStockSymbolsFromIB", 20002 }
         };
+
+        public readonly Dictionary<int, StockDataModel> StockData = new Dictionary<int, StockDataModel>();
 
         internal Dictionary<string, ExecutionsModel> _executions = new Dictionary<string, ExecutionsModel>();
         internal bool _receivingExecutionsInProgress;
@@ -142,23 +144,80 @@ namespace CsharpClient.IbApiLibrary
 
         public void tickPrice(int tickerId, int field, double price, TickAttrib attribs)
         {
-            Console.WriteLine("Tick Price. Ticker Id:" + tickerId + ", Field: " + field + ", Price: " + price + ", CanAutoExecute: " + attribs.CanAutoExecute +
-                ", PastLimit: " + attribs.PastLimit + ", PreOpen: " + attribs.PreOpen);
+            //Console.WriteLine("Tick Price. Ticker Id:" + tickerId + ", Field: " + field + ", Price: " + price + ", CanAutoExecute: " + attribs.CanAutoExecute +
+            //    ", PastLimit: " + attribs.PastLimit + ", PreOpen: " + attribs.PreOpen);
+
+            // reference https://interactivebrokers.github.io/tws-api/tick_types.html
+
+            switch (field)
+            {
+                case 1:
+                    StockData[tickerId].Data.BidPrice = price;
+                    break;
+                case 2:
+                    StockData[tickerId].Data.AskPrice = price;
+                    break;
+                case 4:
+                    StockData[tickerId].Data.LastPrice = price;
+                    break;
+                case 6:
+                    StockData[tickerId].Data.DailyHighPrice = price;
+                    break;
+                case 7:
+                    StockData[tickerId].Data.DailyLowPrice = price;
+                    break;
+                case 9:
+                    StockData[tickerId].Data.PreviousClosePrice = price;
+                    break;
+                case 14:
+                    StockData[tickerId].Data.OpenPrice = price;
+                    break;
+                case 37:
+                    StockData[tickerId].Data.MarkPrice = price;
+                    break;
+                default:
+                    // ignore if not being handled
+                    break;
+            }
+
         }
 
         public void tickSize(int tickerId, int field, int size)
         {
-            Console.WriteLine("Tick Size. Ticker Id:" + tickerId + ", Field: " + field + ", Size: " + size);
+            switch (field)
+            {
+                case 0:
+                    StockData[tickerId].Data.BidSize = size;
+                    break;
+                case 3:
+                    StockData[tickerId].Data.AskSize = size;
+                    break;
+                case 5:
+                    StockData[tickerId].Data.LastSize = size;
+                    break;
+                case 8:
+                    StockData[tickerId].Data.DailyVolume = size;
+                    break;
+                default:
+                    // ignore if not being handled
+                    break;
+            }
         }
 
         public void tickString(int tickerId, int tickType, string value)
         {
-            Console.WriteLine("Tick string. Ticker Id:" + tickerId + ", Type: " + tickType + ", Value: " + value);
+            //Console.WriteLine("Tick string. Ticker Id:" + tickerId + ", Type: " + tickType + ", Value: " + value);
+            // ignore for now
         }
 
         public void tickGeneric(int tickerId, int field, double value)
         {
             Console.WriteLine("Tick Generic. Ticker Id:" + tickerId + ", Field: " + field + ", Value: " + value);
+
+            if (field == 49 && value > 0)
+            {
+                throw new Exception($"StockHaltedException: {tickerId} {value}");
+            }                    
         }
 
         public void tickEFP(int tickerId, int tickType, double basisPoints, string formattedBasisPoints, double impliedFuture, int holdDays, string futureLastTradeDate, double dividendImpact, double dividendsToLastTradeDate)

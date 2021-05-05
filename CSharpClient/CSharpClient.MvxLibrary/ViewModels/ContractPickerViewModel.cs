@@ -5,9 +5,8 @@ using MvvmCross.Navigation;
 using MvvmCross.ViewModels;
 using Newtonsoft.Json;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Text;
+using System.Threading;
 
 namespace CSharpClient.MvxLibrary.ViewModels
 {
@@ -15,8 +14,8 @@ namespace CSharpClient.MvxLibrary.ViewModels
     {
         private IbClient _ibClient;
         private readonly IMvxNavigationService _navigationService;
-        private StockContractModel _selectedContract = new StockContractModel();
-        private ObservableCollection<StockLineItemModel> _mainPageStocks;
+        private ObservableCollection<StockContractModel> _mainStockList;
+        private Thread _dataUpdateThread;
 
         public ContractPickerViewModel(IMvxNavigationService navigationService)
         {
@@ -27,12 +26,11 @@ namespace CSharpClient.MvxLibrary.ViewModels
             NavigateHomeCommand = new MvxCommand(() => _navigationService.Navigate<StockTraderViewModel, NavigationArgs>(
                 new NavigationArgs
                 {
-                    LastUserSelectedContract = _selectedContract,
-                    IbClientIsConnected = true,
                     IbClient = _ibClient,
-                    StockRowList = _mainPageStocks
+                    StockList = _mainStockList,
+                    DataUpdataThread = _dataUpdateThread
                 })
-            );
+            ); ;
         }
 
         public IMvxCommand SearchForSymbolCommand { get; private set; }
@@ -46,14 +44,14 @@ namespace CSharpClient.MvxLibrary.ViewModels
 
         private void SearchForSymbol()
         {
-            Stocks = new ObservableCollection<StockContractModel>();
+            SearchResultsStocks = new ObservableCollection<StockContractModel>();
 
             string stocksJson = _ibClient.GetMatchingStockSymbolsFromIB(SearchText);
-            List<StockContractModel> stocks = JsonConvert.DeserializeObject<List<StockContractModel>>(stocksJson);
+            ObservableCollection<StockContractModel> stocks = JsonConvert.DeserializeObject<ObservableCollection<StockContractModel>>(stocksJson);
 
             foreach (StockContractModel stock in stocks)
             {
-                Stocks.Add(stock);
+                SearchResultsStocks.Add(stock);
             }
 
             SymbolTableVisibility = "Visible";
@@ -79,16 +77,19 @@ namespace CSharpClient.MvxLibrary.ViewModels
                 _selectedStock = value;
                 if (value != null)
                 {
-                    DoSomethingWhenStockSelected(value);
+                    AddSelectedStockAndSendHome(value);
                 }
-
             }
         }
 
-        private void DoSomethingWhenStockSelected(StockContractModel userSelectedContract)
+        private void AddSelectedStockAndSendHome(StockContractModel userSelectedContract)
         {
+            // Initialize the contract before sending back to home page
             userSelectedContract.Exchange = _userExchangeIsSmart ? "SMART" : userSelectedContract.PrimaryExchange;
-            _selectedContract = userSelectedContract;
+            userSelectedContract.Id = DateTimeOffset.Now.ToUnixTimeSeconds();
+            userSelectedContract.IsStreamingData = false;
+    
+            _mainStockList.Add(userSelectedContract);
 
             NavigateHomeCommand.Execute();
         }
@@ -96,8 +97,12 @@ namespace CSharpClient.MvxLibrary.ViewModels
         public override void Prepare(NavigationArgs parameter)
         {
             _ibClient = parameter.IbClient;
-            _mainPageStocks = parameter.StockRowList;
+            _mainStockList = parameter.StockList;
+            _dataUpdateThread = parameter.DataUpdataThread;
+
         }
+
+        public bool CanSearchForSymbol => string.IsNullOrWhiteSpace(SearchText) is false;
 
         public bool ContractRowIsSelected
         {
@@ -106,7 +111,6 @@ namespace CSharpClient.MvxLibrary.ViewModels
         }
 
         private string _searchText = "";
-
         public string SearchText
         {
             get => _searchText;
@@ -117,8 +121,6 @@ namespace CSharpClient.MvxLibrary.ViewModels
             }
         }
 
-        public bool CanSearchForSymbol => string.IsNullOrWhiteSpace(SearchText) is false;
-
         private string _symbolTableVisibility = "Hidden";
         public string SymbolTableVisibility
         {
@@ -126,12 +128,11 @@ namespace CSharpClient.MvxLibrary.ViewModels
             set { SetProperty(ref _symbolTableVisibility, value); }
         }
 
-        private ObservableCollection<StockContractModel> _stocks = new ObservableCollection<StockContractModel>();
-
-        public ObservableCollection<StockContractModel> Stocks
+        private ObservableCollection<StockContractModel> _searchResultsStocks = new ObservableCollection<StockContractModel>();
+        public ObservableCollection<StockContractModel> SearchResultsStocks
         {
-            get => _stocks;
-            set { SetProperty(ref _stocks, value); }
+            get => _searchResultsStocks;
+            set { SetProperty(ref _searchResultsStocks, value); }
         }
 
     }

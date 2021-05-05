@@ -1,5 +1,6 @@
-﻿using IBApi;
-using CsharpClient.IbApiLibrary.Models;
+﻿using CSharpClient.IbApiLibrary.Interfaces;
+using CSharpClient.IbApiLibrary.Models;
+using IBApi;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using System;
@@ -30,6 +31,9 @@ namespace CsharpClient.IbApiLibrary
          
 
         }
+
+        public bool IsConnected { get; private set; }
+        public Dictionary<int, StockDataModel> StockData { get { return _ibConnection.StockData; } }
 
         public string GetMatchingStockSymbolsFromIB(string patternToMatch)
         {
@@ -73,6 +77,24 @@ namespace CsharpClient.IbApiLibrary
             return JsonConvert.SerializeObject(output);
         }
 
+        public void RequestStreamingData(IStockContractModel stock)
+        {
+            Contract ibContract = new Contract
+            {
+                ConId = stock.ContractId,
+                Symbol = stock.Symbol,
+                SecType = stock.SecurityType,
+                Currency = stock.Currency,
+                Exchange = stock.Exchange,
+                PrimaryExch = stock.PrimaryExchange
+            };
+
+            // initialize the new contract in StockData dict
+            _ibConnection.StockData.Add(stock.ContractId, new StockDataModel { StockContract = stock, Data = new DataModel() });
+            // request the data from TWS
+            _clientSocket.reqMktData(stock.ContractId, ibContract, "221,233", false, false, null);
+        }
+
         public void ConnectToIb()
         {
             int ibPort = _config.GetValue<int>("IbPort");
@@ -85,6 +107,8 @@ namespace CsharpClient.IbApiLibrary
             // then start the listening thread
             CreateSignalThread();
             WaitForIbToConnect();
+
+            IsConnected = true;
         }
 
         private static void InitializeEReader()
@@ -112,12 +136,23 @@ namespace CsharpClient.IbApiLibrary
         private static void WaitForIbToConnect()
         {
             // monitor the order's nextValidId reception which comes down automatically after connecting.
-            while (_ibConnection.NextOrderId <= 0) { }
+            int timeoutSeconds = 10;
+            DateTime timeoutTime = DateTime.Now + TimeSpan.FromSeconds(timeoutSeconds);
+
+
+            while (_ibConnection.NextOrderId <= 0)
+            {
+                if (DateTime.Now > timeoutTime)
+                {
+                    throw new TimeoutException($"Could not connect to IB within {timeoutSeconds} seconds.");
+                }
+            }
         }
 
         public void DisconnectIbSocket()
         {
             _clientSocket.eDisconnect();
+            IsConnected = false;
         }
 
         private string ToStringWithNulls(object value)
