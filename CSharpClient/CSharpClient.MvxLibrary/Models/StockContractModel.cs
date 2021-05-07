@@ -8,7 +8,7 @@ namespace CSharpClient.MvxLibrary.Models
         /// <summary>
         /// INotifyPropertyChanged is used here because this class is used in an 
         /// ObservableCollection that is bound to the UI, so each time one of 
-        /// these properties changes the UI needs to be notified.
+        /// these properties changes the MV, and therefore the UI, needs to be notified.
         /// </summary>
 
         public long Id { get; set; }
@@ -18,9 +18,86 @@ namespace CSharpClient.MvxLibrary.Models
         public string Exchange { get; set; }
         public string Currency { get; set; }
         public string PrimaryExchange { get; set; }
-        public double RAmount { get; set; }
         public bool IsStreamingData { get; set; }
 
+        // full properties
+        // these properties have dynamic values that need to be presented to the views
+
+        private double _longPrice;
+        public double LongPrice
+        {
+            get { return _longPrice; }
+            set
+            {
+                if (value == _longPrice) return;
+                _longPrice = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LongPrice"));
+            }
+        }
+
+        private double _shortPrice;
+        public double ShortPrice
+        {
+            get { return _shortPrice; }
+            set
+            {
+                if (value == _shortPrice) return;
+                _shortPrice = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShortPrice"));
+            }
+        }
+
+        private double _rAmount;
+        public double RAmount
+        {
+            get { return _rAmount; }
+            set
+            {
+                if (value == _rAmount) return;
+                _rAmount = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("RAmount"));
+            }
+        }
+
+        private double _position;
+        public double Position
+        {
+            get { return _position; }
+            set
+            {
+                if (value == _position) return;
+                _position = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Position"));
+            }
+        }
+
+        public double TotalPnL { get { return UnrealizedPnL + RealizedPnL; } }
+
+        private double _unrealizedPnL;
+        public double UnrealizedPnL
+        {
+            get { return _unrealizedPnL; }
+            set
+            {
+                if (value == _unrealizedPnL) return;
+                _unrealizedPnL = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("UnrealizedPnL"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TotalPnL"));
+            }
+        }
+
+        private double _realizedPnL;
+        public double RealizedPnL
+        {
+            get { return _realizedPnL; }
+            set
+            {
+                if (value == _realizedPnL) return;
+                _realizedPnL = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("RealizedPnL"));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("TotalPnL"));
+            }
+        }
 
         private double _lastPrice;
         public double LastPrice

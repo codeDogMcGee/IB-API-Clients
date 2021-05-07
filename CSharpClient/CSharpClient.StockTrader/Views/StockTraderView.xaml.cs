@@ -1,4 +1,5 @@
 ﻿using MvvmCross.Platforms.Wpf.Views;
+using System;
 
 namespace CSharpClient.StockTrader.Views
 {
@@ -7,14 +8,10 @@ namespace CSharpClient.StockTrader.Views
     /// </summary>
     public partial class StockTraderView : MvxWpfView
     {
-        //StockContractPicker.MainWindow contractPicker;
-
-
         public StockTraderView()
         {
             InitializeComponent();
-        }
 
-      
+        }
     }
 }

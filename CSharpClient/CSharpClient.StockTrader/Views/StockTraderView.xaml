@@ -5,11 +5,11 @@
       xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
       xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
       xmlns:local="clr-namespace:CSharpClient.StockTrader.Views"
     xmlns:viewmodels="clr-namespace:CSharpClient.MvxLibrary.ViewModels;assembly=CSharpClient.MvxLibrary" 
     d:DataContext="{d:DesignInstance Type=viewmodels:StockTraderViewModel}"
-    mc:Ignorable="d" 
+    mc:Ignorable="d"
     FontSize="20" FontFamily="Helvetica" 
     d:DesignHeight="450" d:DesignWidth="1200"
     Background="#FF130D40" Foreground="Gainsboro">
@@ -18,23 +18,30 @@
         <DataTemplate x:Key="StockLineTemplate">
             <Border CornerRadius="5" HorizontalAlignment="Stretch" Padding="5" Margin="3">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch" Width="Auto">
-                    <TextBlock Width="auto" MinWidth="200">
+                    <TextBlock Width="200">
                         <TextBlock.Text>
-                            <MultiBinding StringFormat="{}{0} {1} {2}">
+                            <MultiBinding StringFormat="{}{0}    {1} {2}">
                                 <Binding Path="Symbol"/>
                                 <Binding Path="Exchange"/>
                                 <Binding Path="PrimaryExchange"/>
                             </MultiBinding>
                         </TextBlock.Text>
                     </TextBlock>
-                    <TextBlock MinWidth="25" Text="{Binding Path=BidSize}"/>
-                    <TextBlock MinWidth="60" Text="{Binding Path=BidPrice}"/>
-                    <TextBlock MinWidth="60" Text="{Binding Path=AskPrice}"/>
-                    <TextBlock MinWidth="25" Text="{Binding Path=AskSize}"/>
-                    <TextBlock MinWidth="100" Text="{Binding Path=MarkPrice}"/>
-                    <TextBlock MinWidth="60" Text="{Binding Path=TodaysLowPrice}"/>
-                    <TextBlock MinWidth="60" Text="{Binding Path=TodaysHighPrice}"/>
-                    <TextBox MinWidth="60" Text="{Binding Path=RAmount}"/>
+                    <TextBlock Width="25" Text="{Binding Path=BidSize}"/>
+                    <TextBlock Width="50" Text="{Binding Path=BidPrice, StringFormat=N2}"/>
+                    <TextBlock Width="50" Text="{Binding Path=AskPrice, StringFormat=N2}"/>
+                    <TextBlock Width="25" Text="{Binding Path=AskSize}"/>
+                    <TextBlock Width="25" Text=""/>
+                    <TextBlock Width="25" Text="{Binding Path=Position, StringFormat=N0}"/>
+                    <TextBlock Width="25" Text="{Binding Path=TotalPnL, StringFormat=N2}"/>
+                    <TextBlock Width="25" Text=""/>
+                    <TextBlock Width="50" Text="{Binding Path=MarkPrice, StringFormat=N2}"/>
+                    <TextBlock Width="50" Text="{Binding Path=TodaysLowPrice, StringFormat=N2}"/>
+                    <TextBlock Width="50" Text="{Binding Path=TodaysHighPrice, StringFormat=N2}"/>
+                    <TextBlock Width="25" Text=""/>
+                    <TextBox Width="50" Text="{Binding Path=LongPrice}"/>
+                    <TextBox Width="50" Text="{Binding Path=ShortPrice}"/>
+                    <TextBox Width="50" Text="{Binding Path=RAmount}"/>
                 </StackPanel>
             </Border>
         </DataTemplate>
@@ -99,15 +106,41 @@
             </Button.Resources>
         </Button>
 
-        <ListBox Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3" MinWidth="500" HorizontalContentAlignment="Stretch" 
-                 ItemsSource="{Binding Stocks}" ItemTemplate="{StaticResource StockLineTemplate}"
-                 FontSize="14">
-            <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem">
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"></Setter>
+        <ListView Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
+                  FontSize="14"
+                  ItemsSource="{Binding Stocks}">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                 </Style>
-            </ListBox.ItemContainerStyle>
-        </ListBox>
+            </ListView.ItemContainerStyle>
+            <ListView.View>
+                
+                <GridView>
+                    <GridViewColumn Header="Symbol" DisplayMemberBinding="{Binding Path=Symbol}"/>
+                    <GridViewColumn Header="Exchange" DisplayMemberBinding="{Binding Path=Exchange}"/>
+                    <GridViewColumn Header="PrimaryExchg" DisplayMemberBinding="{Binding Path=PrimaryExchange}"/>
+                    <GridViewColumn Header="Position" DisplayMemberBinding="{Binding Path=Position, StringFormat=N0}"/>
+                    <GridViewColumn Header="Mark" DisplayMemberBinding="{Binding Path=MarkPrice, StringFormat=N2}"/>
+                    <GridViewColumn Header="High" DisplayMemberBinding="{Binding Path=TodaysHighPrice, StringFormat=N2}"/>
+                    <GridViewColumn Header="Low" DisplayMemberBinding="{Binding Path=TodaysLowPrice, StringFormat=N2}"/>
+
+                    <GridViewColumn Header="RiskAmt" Width="100">
+                        <GridViewColumn.CellTemplate >
+                            <DataTemplate>
+                                <TextBox>
+                                    <TextBox.Style>
+                                        <Style TargetType="{x:Type TextBox}">
+                                            <Setter Property="Text" Value="{Binding Path=RAmount, Mode=TwoWay, ValidatesOnDataErrors=True, UpdateSourceTrigger=Explicit}" />
+                                        </Style>
+                                    </TextBox.Style>
+                                </TextBox>
+                            </DataTemplate>
+                        </GridViewColumn.CellTemplate>
+                    </GridViewColumn>
+                </GridView>
+            </ListView.View>
+        </ListView>
 
     </Grid>
 </views:MvxWpfView>

@@ -10,6 +10,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CSharpClient.IbApiLibrary\CSharpClient.IbApiLibrary.csproj" />
+    <ProjectReference Include="..\CSharpClient.LoggerLibrary\CSharpClient.LoggerLibrary.csproj" />
     <ProjectReference Include="..\IbApiLibrary\CSharpClient.IbApiLibrary.csproj" />
   </ItemGroup>
 

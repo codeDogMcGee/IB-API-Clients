@@ -2,7 +2,7 @@
 
 _Disclaimer:_
 
-_Trading is risky, so don't engage in any trading activities without first consulting a professional. This project is meant for **EDUCATIONAL PURPOSES ONLY** and is not intened to be used with a real money account. Use an Interactive Brokers' simuation account if you would like to try this, or any, API client. The author(s) of this API are not intending for anyone to use this code, in any way, on a live money account, and therefore are not responsible for any losses incurred as a result of using this code. Clone, copy, and make pull requests at your own risk._
+_Trading is risky, so do not engage in any trading activities without first consulting a professional. This project is meant for **EDUCATIONAL PURPOSES ONLY** and is not intened to be used with a real money account. Use an Interactive Brokers' simuation account if you would like to try this, or any, API client. The author(s) of this API are not intending for anyone to use this code, in any way, on a live money account, and therefore are not responsible for any losses incurred as a result of using this code. Clone, copy, and make pull requests at your own risk._
 
 ## CSharp Client
 

@@ -18,5 +18,10 @@ namespace CSharpClient.IbApiLibrary.Models
         public int AskSize { get; set; }
         public int LastSize { get; set; }
         public int DailyVolume { get; set; }
+        public double Position { get; set; }
+        public double AverageCost { get; set; }
+        public double UnrealizedPnL { get; set; }
+        public double RealizedPnL { get; set; }
+        public string Account { get; set; }
     }
 }

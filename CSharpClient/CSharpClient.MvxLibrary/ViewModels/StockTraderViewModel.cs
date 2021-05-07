@@ -2,23 +2,21 @@
 using MvvmCross.ViewModels;
 using CsharpClient.IbApiLibrary;
 using System.Collections.ObjectModel;
-using Newtonsoft.Json;
-using System.Collections.Generic;
-using System;
 using MvvmCross.Navigation;
 using CSharpClient.MvxLibrary.Models;
 using System.Threading;
-using System.Threading.Tasks;
+using System;
+using System.Collections.Generic;
 using System.ComponentModel;
-using System.Collections.Specialized;
-using System.Collections;
 
 namespace CSharpClient.MvxLibrary.ViewModels
-{
+{ 
 
     public class StockTraderViewModel : MvxViewModel<NavigationArgs>
     {
         // Class variables
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         private IbClient _ibClient;
         private readonly IMvxNavigationService _navigationService;
         private Thread _dataUpdateThread;
@@ -27,24 +25,17 @@ namespace CSharpClient.MvxLibrary.ViewModels
         // Contstructor
         public StockTraderViewModel(IMvxNavigationService navigationService)
         {
+            Logger.Debug("Starting StockTraderViewModel");
+
             _navigationService = navigationService;
-            //AddNewStockCommand = new MvxCommand(() => _navigationService.Navigate<ContractPickerViewModel, NavigationArgs>(
-            //    new NavigationArgs
-            //    {
-            //        IbClient = _ibClient,
-            //        StockList = Stocks,
-            //        DataUpdataThread = _dataUpdateThread
-            //    })
-            //);
             AddNewStockCommand = new MvxCommand(NavigateToStockPickerPage);
-
-
             ConnectIbCommand = new MvxCommand(ConnectToIb);
         }
 
         // Properties
         public IMvxCommand ConnectIbCommand { get; private set; }
         public IMvxCommand AddNewStockCommand { get; private set; }
+
         public string IsConnectedLabel { get => IbIsConnected ? "Connected" : "Disconnected"; }
         public string ConnectionButtonText { get => IbIsConnected ? "Disconnect IB" : "Connect IB"; }
         public bool IbIsConnected { get => _ibClient != null && _ibClient.IsConnected; }
@@ -60,6 +51,14 @@ namespace CSharpClient.MvxLibrary.ViewModels
             }
         }
 
+        public void ShutdownHandler()
+        {
+            if (_ibClient != null)
+            {
+                ConnectToIb();
+            }
+        }
+
         // Methods
         private void ConnectToIb()
         {
@@ -69,17 +68,26 @@ namespace CSharpClient.MvxLibrary.ViewModels
 
                 _ibClient.DisconnectIbSocket();
                 _ibClient = null;
-                
+
+                foreach (var stock in Stocks)
+                {
+                    stock.IsStreamingData = false;
+                }
             }
             else
             {
                 _ibClient = new IbClient();
                 _ibClient.ConnectToIb();
 
-                // If there are existing stocks then start the price
-                // thread once connected
+                _ibClient.RequestAccountUpdates();
+
+
+                InitializeStocksList();
+                // If there are existing stocks then repopulate
+                // the instance data and start the price update thread
                 if (Stocks.Count > 0)
                 {
+                    StreamDataFromStocksList();
                     StartUpdatePricesThread();
                 }
             }
@@ -87,6 +95,43 @@ namespace CSharpClient.MvxLibrary.ViewModels
             RaisePropertyChanged(() => IbIsConnected);
             RaisePropertyChanged(() => IsConnectedLabel);
             RaisePropertyChanged(() => ConnectionButtonText);
+        }
+
+        private void InitializeStocksList()
+        {
+            List<int> exitingIds = new List<int>();
+            foreach (var stock in Stocks)
+            {
+                exitingIds.Add(stock.ContractId);
+            }
+            
+
+            if (_ibClient.StockData.Count > 0)
+            {
+                foreach (var stock in _ibClient.StockData.Values)
+                {
+                    if (exitingIds.Contains(stock.StockContract.ContractId) is false)
+                    {
+                        StockContractModel newStock = new StockContractModel
+                        {
+                            Id = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                            ContractId = stock.StockContract.ContractId,
+                            Symbol = stock.StockContract.Symbol,
+                            SecurityType = stock.StockContract.SecurityType,
+                            Exchange = stock.StockContract.Exchange,
+                            PrimaryExchange = stock.StockContract.PrimaryExchange,
+                            IsStreamingData = false,
+                            Position = stock.Data.Position,
+                            UnrealizedPnL = stock.Data.UnrealizedPnL,
+                            RealizedPnL = stock.Data.RealizedPnL,
+                            MarkPrice = stock.Data.MarkPrice
+                        };
+
+                        Stocks.Add(newStock);
+                    }
+                }
+            }
+
         }
 
         private void StreamDataFromStocksList()
@@ -121,17 +166,19 @@ namespace CSharpClient.MvxLibrary.ViewModels
         private void StopUpdatePricesThread()
         {
             _stopDataUpdateThread = true;
-            while (_dataUpdateThread != null && _dataUpdateThread.IsAlive)
-            {
-                _dataUpdateThread.Interrupt();
-            }
+            while (_dataUpdateThread != null && _dataUpdateThread.IsAlive) {}
+            Logger.Debug("UpdatePricesThread stopped.");
         }
 
         private void StartUpdatePricesThread()
         {
             _stopDataUpdateThread = false;
-            _dataUpdateThread = new Thread(new ThreadStart(UpdatePricesThread));
+            _dataUpdateThread = new Thread(new ThreadStart(UpdatePricesThread))
+            {
+                IsBackground = true
+            };
             _dataUpdateThread.Start();
+            Logger.Debug("UpdatePricesThread started.");
         }
 
         public override void Prepare(NavigationArgs parameter)
@@ -141,7 +188,6 @@ namespace CSharpClient.MvxLibrary.ViewModels
             Stocks = parameter.StockList;
 
             StreamDataFromStocksList();
-
             StartUpdatePricesThread();
         }
 
@@ -149,21 +195,30 @@ namespace CSharpClient.MvxLibrary.ViewModels
         {
             while (_stopDataUpdateThread is false)
             {
-                // TODO: see if I can use events to update just the parts of the list that have updated
-                //       rather than continually looping through all of the values and updating them.
-                foreach (var stock in Stocks)
+                if (_ibClient != null)
                 {
-                    if (_ibClient != null && _ibClient.StockData.ContainsKey(stock.ContractId))
+                    // TODO: see if I can use events to update just the parts of the list that have updated
+                    //       rather than continually looping through all of the values and updating them.
+                    foreach (var stock in Stocks)
                     {
-                        stock.BidPrice = _ibClient.StockData[stock.ContractId].Data.BidPrice;
-                        stock.AskPrice = _ibClient.StockData[stock.ContractId].Data.AskPrice;
-                        stock.BidSize = _ibClient.StockData[stock.ContractId].Data.BidSize;
-                        stock.AskSize = _ibClient.StockData[stock.ContractId].Data.AskSize;
+                        if (_ibClient.StockData.ContainsKey(stock.ContractId))
+                        {
+                            stock.BidPrice = _ibClient.StockData[stock.ContractId].Data.BidPrice;
+                            stock.AskPrice = _ibClient.StockData[stock.ContractId].Data.AskPrice;
 
-                        stock.MarkPrice = _ibClient.StockData[stock.ContractId].Data.MarkPrice;
-                        stock.TodaysLowPrice = _ibClient.StockData[stock.ContractId].Data.DailyLowPrice;
-                        stock.TodaysHighPrice = _ibClient.StockData[stock.ContractId].Data.DailyHighPrice;
+                            stock.BidSize = _ibClient.StockData[stock.ContractId].Data.BidSize;
+                            stock.AskSize = _ibClient.StockData[stock.ContractId].Data.AskSize;
+
+                            stock.MarkPrice = _ibClient.StockData[stock.ContractId].Data.MarkPrice;
+                            
+                            stock.TodaysLowPrice = _ibClient.StockData[stock.ContractId].Data.DailyLowPrice;
+                            stock.TodaysHighPrice = _ibClient.StockData[stock.ContractId].Data.DailyHighPrice;
+
+                            stock.Position = _ibClient.StockData[stock.ContractId].Data.Position;
+                            stock.UnrealizedPnL = _ibClient.StockData[stock.ContractId].Data.UnrealizedPnL;
+                        }
                     }
+                    Thread.Sleep(100);
                 }
             }
         }

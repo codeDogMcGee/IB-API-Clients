@@ -15,6 +15,8 @@ namespace CsharpClient.IbApiLibrary
 {
     public class IbClient
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         private static IConfiguration _config;
         private static EWrapperImplementation _ibConnection;
         private static EClientSocket _clientSocket;
@@ -89,8 +91,14 @@ namespace CsharpClient.IbApiLibrary
                 PrimaryExch = stock.PrimaryExchange
             };
 
-            // initialize the new contract in StockData dict
-            _ibConnection.StockData.Add(stock.ContractId, new StockDataModel { StockContract = stock, Data = new DataModel() });
+            
+            // entry may exist if loaded from positions upon connection
+            if (_ibConnection.StockData.ContainsKey(stock.ContractId) is false)
+            {
+                // initialize the new contract in StockData dict
+                _ibConnection.StockData.Add(stock.ContractId, new StockDataModel { StockContract = stock, Data = new DataModel() });
+            }
+            
             // request the data from TWS
             _clientSocket.reqMktData(stock.ContractId, ibContract, "221,233", false, false, null);
         }
@@ -100,7 +108,9 @@ namespace CsharpClient.IbApiLibrary
             int ibPort = _config.GetValue<int>("IbPort");
             int ibConnectionId = _config.GetValue<int>("IbConnectionId");
 
-            _clientSocket.eConnect("127.0.0.1", ibPort, ibConnectionId);
+            string host = "127.0.0.1";
+
+            _clientSocket.eConnect(host, ibPort, ibConnectionId);
 
             // after connecting to ib start the reader
             InitializeEReader();
@@ -108,7 +118,25 @@ namespace CsharpClient.IbApiLibrary
             CreateSignalThread();
             WaitForIbToConnect();
 
+            //RequestAccountUpdates();
+
             IsConnected = true;
+
+            Logger.Info("Connected to IB TWS host: {host}, port: {ibPort}, ConnectionId: {ibConnectionId}", host, ibPort, ibConnectionId);
+        }
+
+        public void DisconnectIbSocket()
+        {
+            _clientSocket.eDisconnect();
+            IsConnected = false;
+            Logger.Info("Disconnected from IB TWS");
+        }
+
+        public void RequestAccountUpdates()
+        {
+            _clientSocket.reqAccountUpdates(true, _config.GetValue<string>("AccountNumber"));
+            
+            while (_ibConnection.AccountDataFinishedDownloading is false) { }
         }
 
         private static void InitializeEReader()
@@ -149,18 +177,12 @@ namespace CsharpClient.IbApiLibrary
             }
         }
 
-        public void DisconnectIbSocket()
-        {
-            _clientSocket.eDisconnect();
-            IsConnected = false;
-        }
-
         private string ToStringWithNulls(object value)
         {
             return value == null ? "" : value.ToString();
         }
 
-        public static object GetPropertyValue(object sourceObject, string propertyName)
+        private static object GetPropertyValue(object sourceObject, string propertyName)
         {
             return sourceObject.GetType().GetProperty(propertyName).GetValue(sourceObject, null);
         }

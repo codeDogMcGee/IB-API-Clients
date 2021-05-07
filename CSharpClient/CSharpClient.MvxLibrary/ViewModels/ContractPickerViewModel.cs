@@ -12,6 +12,8 @@ namespace CSharpClient.MvxLibrary.ViewModels
 {
     public class ContractPickerViewModel : MvxViewModel<NavigationArgs>
     {
+        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+
         private IbClient _ibClient;
         private readonly IMvxNavigationService _navigationService;
         private ObservableCollection<StockContractModel> _mainStockList;
@@ -19,6 +21,8 @@ namespace CSharpClient.MvxLibrary.ViewModels
 
         public ContractPickerViewModel(IMvxNavigationService navigationService)
         {
+            Logger.Debug("Starting ContractPickerViewModel");
+
             SearchForSymbolCommand = new MvxCommand(SearchForSymbol);
             ContractExchangeCommand = new MvxCommand(ToggleUserExchangeChoice);
 

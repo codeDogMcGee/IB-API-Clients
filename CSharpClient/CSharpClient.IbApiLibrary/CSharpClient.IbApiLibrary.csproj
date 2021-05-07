@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CSharpClient.LoggerLibrary\CSharpClient.LoggerLibrary.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="CSharpAPI">
       <HintPath>..\CSharpAPI.dll</HintPath>
     </Reference>
