@@ -3,15 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 16
 VisualStudioVersion = 16.0.31205.134
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpClient.ConsoleUI", "CSharpClient.ConsoleUI\CSharpClient.ConsoleUI.csproj", "{5B0D2F62-7CD2-46A8-9A83-AE171B6B1A16}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConsoleUI", "ConsoleUI\ConsoleUI.csproj", "{5B0D2F62-7CD2-46A8-9A83-AE171B6B1A16}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpClient.IbApiLibrary", "CSharpClient.IbApiLibrary\CSharpClient.IbApiLibrary.csproj", "{239B4811-D393-45D2-900D-C6C56D380302}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IbApiLibrary", "IbApiLibrary\IbApiLibrary.csproj", "{239B4811-D393-45D2-900D-C6C56D380302}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpClient.MvxLibrary", "CSharpClient.MvxLibrary\CSharpClient.MvxLibrary.csproj", "{481F8B9A-9683-4917-95EF-D74FD79F8027}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MvxLibrary", "MvxLibrary\MvxLibrary.csproj", "{481F8B9A-9683-4917-95EF-D74FD79F8027}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpClient.StockTrader", "CSharpClient.StockTrader\CSharpClient.StockTrader.csproj", "{EC9A9965-99F9-4810-8D46-EECCB06E6A00}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StockTrader", "StockTrader\StockTrader.csproj", "{EC9A9965-99F9-4810-8D46-EECCB06E6A00}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CSharpClient.LoggerLibrary", "CSharpClient.LoggerLibrary\CSharpClient.LoggerLibrary.csproj", "{7302735B-89C6-486A-9046-29D859E94A54}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LoggerLibrary", "LoggerLibrary\LoggerLibrary.csproj", "{7302735B-89C6-486A-9046-29D859E94A54}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

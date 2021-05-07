@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MvvmCross" Version="7.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\IbApiLibrary\IbApiLibrary.csproj" />
+    <ProjectReference Include="..\LoggerLibrary\LoggerLibrary.csproj" />
+  </ItemGroup>
+
+</Project>
