@@ -15,7 +15,7 @@ namespace CsharpClient.IbApiLibrary
 {
     public class IbClient
     {
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
 
         private static IConfiguration _config;
         private static EWrapperImplementation _ibConnection;
@@ -28,7 +28,7 @@ namespace CsharpClient.IbApiLibrary
             InitializeConfiguration();
 
             _ibConnection = new EWrapperImplementation();
-            _clientSocket = _ibConnection.ClientSocket;
+            _clientSocket = _ibConnection._clientSocket;
             _readerSignal = _ibConnection._signal;
          
 
@@ -36,6 +36,33 @@ namespace CsharpClient.IbApiLibrary
 
         public bool IsConnected { get; private set; }
         public Dictionary<int, StockDataModel> StockData { get { return _ibConnection.StockData; } }
+
+        public void PlaceTrailingStopOrder(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double trailingAmount, double trailingStopPrice, double limitPriceOffset, int ocaType = 2, string ocaGroupName = "")
+        {
+            Contract contract = new Contract
+            {
+                ConId = stockContract.ContractId,
+                Symbol = stockContract.Symbol,
+                SecIdType = stockContract.SecurityType,
+                Exchange = stockContract.Exchange,
+                PrimaryExch = stockContract.PrimaryExchange,
+                Currency = stockContract.Currency
+            };
+
+            Order order = new Order
+            {
+                Action = buyOrSell.ToUpper(),
+                OrderType = "TRAIL LIMIT",
+                TotalQuantity = orderQuantity,
+                TrailStopPrice = trailingStopPrice,
+                LmtPriceOffset = limitPriceOffset,
+                AuxPrice = trailingAmount,
+                OcaType = ocaType,
+                OcaGroup = ocaGroupName
+            };
+
+            _clientSocket.placeOrder(_ibConnection._nextOrderId++, contract, order);
+        }
 
         public string GetMatchingStockSymbolsFromIB(string patternToMatch)
         {
@@ -50,10 +77,10 @@ namespace CsharpClient.IbApiLibrary
             while (stocks.Count == 0)
             {
                 Thread.Sleep(1000);
-                stocks = _ibConnection.Stocks;
+                stocks = _ibConnection._symbolLookupStocks;
 
                 // after retreiving the stocks from the Wrapper clear the Wrapper list
-                _ibConnection.Stocks = new List<StockContractModel>();
+                _ibConnection._symbolLookupStocks = new List<StockContractModel>();
             }
 
             return JsonConvert.SerializeObject(stocks);
@@ -118,18 +145,16 @@ namespace CsharpClient.IbApiLibrary
             CreateSignalThread();
             WaitForIbToConnect();
 
-            //RequestAccountUpdates();
-
             IsConnected = true;
 
-            Logger.Info("Connected to IB TWS host: {host}, port: {ibPort}, ConnectionId: {ibConnectionId}", host, ibPort, ibConnectionId);
+            _logger.Info("Connected to IB TWS host: {host}, port: {ibPort}, ConnectionId: {ibConnectionId}", host, ibPort, ibConnectionId);
         }
 
         public void DisconnectIbSocket()
         {
             _clientSocket.eDisconnect();
             IsConnected = false;
-            Logger.Info("Disconnected from IB TWS");
+            _logger.Info("Disconnected from IB TWS");
         }
 
         public void RequestAccountUpdates()
@@ -137,6 +162,11 @@ namespace CsharpClient.IbApiLibrary
             _clientSocket.reqAccountUpdates(true, _config.GetValue<string>("AccountNumber"));
             
             while (_ibConnection.AccountDataFinishedDownloading is false) { }
+        }
+
+        private static void RequestOpenOrders()
+        {
+            _clientSocket.reqOpenOrders();
         }
 
         private static void InitializeEReader()
@@ -168,7 +198,7 @@ namespace CsharpClient.IbApiLibrary
             DateTime timeoutTime = DateTime.Now + TimeSpan.FromSeconds(timeoutSeconds);
 
 
-            while (_ibConnection.NextOrderId <= 0)
+            while (_ibConnection._nextOrderId <= 0)
             {
                 if (DateTime.Now > timeoutTime)
                 {

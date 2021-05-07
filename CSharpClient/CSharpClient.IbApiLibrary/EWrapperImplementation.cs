@@ -10,12 +10,13 @@ namespace CsharpClient.IbApiLibrary
 {
     public class EWrapperImplementation : EWrapper
     {
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
-
-        private int _nextOrderId;
-        private EClientSocket _clientSocket;
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
+        private static readonly NLog.Logger _fillsLogger = NLog.LogManager.GetLogger("FillsLog");
 
         internal readonly EReaderSignal _signal;
+        internal readonly EClientSocket _clientSocket;
+
+        internal int _nextOrderId = -1;
 
         internal readonly Dictionary<string, int> _reqIdMap = new Dictionary<string, int> 
         {
@@ -30,30 +31,33 @@ namespace CsharpClient.IbApiLibrary
         internal Dictionary<string, ExecutionsModel> _executions = new Dictionary<string, ExecutionsModel>();
         internal bool _receivingExecutionsInProgress;
 
-        public List<StockContractModel> Stocks = new List<StockContractModel>();
-
-        public DateTime LastAccountUpdateTime { get; private set; } = new DateTime(1, 1, 1);
-        public bool AccountDataFinishedDownloading { get; private set; } = false;
-
-        public EClientSocket ClientSocket
-        {
-            get { return _clientSocket; }
-            set { _clientSocket = value; }
-        }
-
-        public int NextOrderId
-        {
-            get { return _nextOrderId; }
-            set { _nextOrderId = value; }
-        }
-
-        public string BboExchange { get; private set; }
-
-        // constructor - initialize class
+        public List<StockContractModel> _symbolLookupStocks = new List<StockContractModel>();
+        
+        // Constructor
         public EWrapperImplementation()
         {
             _signal = new EReaderMonitorSignal();
             _clientSocket = new EClientSocket(this, _signal);
+        }
+        
+        // Properties
+        public DateTime LastAccountUpdateTime { get; private set; } = new DateTime(1, 1, 1);
+        public bool AccountDataFinishedDownloading { get; private set; } = false;
+
+        // Methods
+        public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void openOrderEnd()
+        {
+            throw new NotImplementedException();
         }
 
         public void updateAccountValue(string key, string value, string currency, string accountName)
@@ -110,6 +114,7 @@ namespace CsharpClient.IbApiLibrary
                 StockData[contract.ConId].Data.AverageCost = averageCost;
                 StockData[contract.ConId].Data.UnrealizedPnL = unrealizedPNL;
                 StockData[contract.ConId].Data.RealizedPnL = realizedPNL;
+                StockData[contract.ConId].Data.AccountValueMarkPrice = marketPrice;
             }
             else
             {
@@ -124,7 +129,8 @@ namespace CsharpClient.IbApiLibrary
                     Position = position,
                     AverageCost = averageCost,
                     UnrealizedPnL = unrealizedPNL,
-                    RealizedPnL = realizedPNL
+                    RealizedPnL = realizedPNL,
+                    AccountValueMarkPrice = marketPrice
                 };
 
                 IStockContractModel stockContract = new StockContractModel
@@ -216,7 +222,7 @@ namespace CsharpClient.IbApiLibrary
                             PrimaryExchange = contractDescription.Contract.PrimaryExch
                         };
 
-                        Stocks.Add(stock);
+                        _symbolLookupStocks.Add(stock);
                     }
                 }
             }
@@ -226,24 +232,24 @@ namespace CsharpClient.IbApiLibrary
 
         public void error(Exception e)
         {
-            Logger.Error(e);
+            _logger.Error(e);
             throw e;
         }
 
         public void error(string str)
         {
-            Logger.Error("TWS ERROR: ErrorMsg={errorMsg}", str);
+            _logger.Error("TWS ERROR: ErrorMsg={errorMsg}", str);
         }
 
         public void error(int id, int errorCode, string errorMsg)
         {
             if (id == -1)
             {
-                Logger.Info($"TWS Connection Info: {errorCode} {errorMsg}");
+                _logger.Info($"TWS Connection Info: {errorCode} {errorMsg}");
             }
             else
             {
-                Logger.Error("TWS ERROR: id={id}, ErrorCode={errorCode}, ErrorMsg={errorMsg}", id, errorCode, errorMsg);
+                _logger.Error("TWS ERROR: id={id}, ErrorCode={errorCode}, ErrorMsg={errorMsg}", id, errorCode, errorMsg);
             }
 
         }
@@ -327,12 +333,12 @@ namespace CsharpClient.IbApiLibrary
 
         public void nextValidId(int orderId)
         {
-            NextOrderId = orderId;
+            _nextOrderId = orderId;
         }
 
         public void managedAccounts(string accountsList)
         {
-            Logger.Debug("Managed Accounds:{accountsList}", accountsList);
+            _logger.Debug("Managed Accounds:{accountsList}", accountsList);
         }
 
 
@@ -355,13 +361,13 @@ namespace CsharpClient.IbApiLibrary
 
         public void tickReqParams(int tickerId, double minTick, string bboExchange, int snapshotPermissions)
         {
-            Logger.Debug($"Tick Request Params: TickerId={tickerId}, MinTick={minTick}, BBOExchange={bboExchange}, SpapshotPermissions={snapshotPermissions}");
+            _logger.Debug($"Tick Request Params: TickerId={tickerId}, MinTick={minTick}, BBOExchange={bboExchange}, SpapshotPermissions={snapshotPermissions}");
 
         }
 
         public void marketDataType(int reqId, int marketDataType)
         {
-            Logger.Debug($"Market Data Type: ReqId={reqId} Type={marketDataType}", reqId, marketDataType);
+            _logger.Debug($"Market Data Type: ReqId={reqId} Type={marketDataType}", reqId, marketDataType);
 
         }
 
@@ -396,21 +402,6 @@ namespace CsharpClient.IbApiLibrary
         }
 
         public void bondContractDetails(int reqId, ContractDetails contract)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
-        {
-            throw new NotImplementedException();
-        }
-
-        public void openOrderEnd()
         {
             throw new NotImplementedException();
         }

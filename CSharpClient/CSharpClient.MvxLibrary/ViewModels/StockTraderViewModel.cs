@@ -15,7 +15,7 @@ namespace CSharpClient.MvxLibrary.ViewModels
     public class StockTraderViewModel : MvxViewModel<NavigationArgs>
     {
         // Class variables
-        private static readonly NLog.Logger Logger = NLog.LogManager.GetCurrentClassLogger();
+        private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
 
         private IbClient _ibClient;
         private readonly IMvxNavigationService _navigationService;
@@ -25,7 +25,7 @@ namespace CSharpClient.MvxLibrary.ViewModels
         // Contstructor
         public StockTraderViewModel(IMvxNavigationService navigationService)
         {
-            Logger.Debug("Starting StockTraderViewModel");
+            _logger.Debug("Starting StockTraderViewModel");
 
             _navigationService = navigationService;
             AddNewStockCommand = new MvxCommand(NavigateToStockPickerPage);
@@ -122,7 +122,7 @@ namespace CSharpClient.MvxLibrary.ViewModels
                             PrimaryExchange = stock.StockContract.PrimaryExchange,
                             IsStreamingData = false,
                             Position = stock.Data.Position,
-                            UnrealizedPnL = stock.Data.UnrealizedPnL,
+                            UnrealizedPnL = 0,
                             RealizedPnL = stock.Data.RealizedPnL,
                             MarkPrice = stock.Data.MarkPrice
                         };
@@ -131,7 +131,6 @@ namespace CSharpClient.MvxLibrary.ViewModels
                     }
                 }
             }
-
         }
 
         private void StreamDataFromStocksList()
@@ -167,7 +166,7 @@ namespace CSharpClient.MvxLibrary.ViewModels
         {
             _stopDataUpdateThread = true;
             while (_dataUpdateThread != null && _dataUpdateThread.IsAlive) {}
-            Logger.Debug("UpdatePricesThread stopped.");
+            _logger.Debug("UpdatePricesThread stopped.");
         }
 
         private void StartUpdatePricesThread()
@@ -178,7 +177,7 @@ namespace CSharpClient.MvxLibrary.ViewModels
                 IsBackground = true
             };
             _dataUpdateThread.Start();
-            Logger.Debug("UpdatePricesThread started.");
+            _logger.Debug("UpdatePricesThread started.");
         }
 
         public override void Prepare(NavigationArgs parameter)
@@ -187,9 +186,19 @@ namespace CSharpClient.MvxLibrary.ViewModels
             _dataUpdateThread = parameter.DataUpdataThread;
             Stocks = parameter.StockList;
 
+            //// If this doesn't get reset the pnl will be messed up
+            //// when navigating back
+            //foreach (var stock in Stocks)
+            //{
+            //    stock.UnrealizedPnL = 0;
+            //}
+
             StreamDataFromStocksList();
             StartUpdatePricesThread();
         }
+
+
+        //private List<>
 
         private void UpdatePricesThread()
         {
@@ -215,7 +224,18 @@ namespace CSharpClient.MvxLibrary.ViewModels
                             stock.TodaysHighPrice = _ibClient.StockData[stock.ContractId].Data.DailyHighPrice;
 
                             stock.Position = _ibClient.StockData[stock.ContractId].Data.Position;
-                            stock.UnrealizedPnL = _ibClient.StockData[stock.ContractId].Data.UnrealizedPnL;
+
+                            
+                            // IB doesn't update pnl in real time to the api so use the snapshot pricing and then adjust
+                            //if (stock.UnrealizedPnL != 0)
+                            //{
+                            double pnlDiffSinceSnapshot = (stock.MarkPrice - _ibClient.StockData[stock.ContractId].Data.AccountValueMarkPrice) * stock.Position;
+                            stock.UnrealizedPnL = _ibClient.StockData[stock.ContractId].Data.UnrealizedPnL + pnlDiffSinceSnapshot;
+                            //}
+                            //else
+                            //{
+                            //    stock.UnrealizedPnL = _ibClient.StockData[stock.ContractId].Data.UnrealizedPnL;
+                            //}
                         }
                     }
                     Thread.Sleep(100);

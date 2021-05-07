@@ -15,36 +15,9 @@
     Background="#FF130D40" Foreground="Gainsboro">
 
     <views:MvxWpfView.Resources>
-        <DataTemplate x:Key="StockLineTemplate">
-            <Border CornerRadius="5" HorizontalAlignment="Stretch" Padding="5" Margin="3">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Stretch" Width="Auto">
-                    <TextBlock Width="200">
-                        <TextBlock.Text>
-                            <MultiBinding StringFormat="{}{0}    {1} {2}">
-                                <Binding Path="Symbol"/>
-                                <Binding Path="Exchange"/>
-                                <Binding Path="PrimaryExchange"/>
-                            </MultiBinding>
-                        </TextBlock.Text>
-                    </TextBlock>
-                    <TextBlock Width="25" Text="{Binding Path=BidSize}"/>
-                    <TextBlock Width="50" Text="{Binding Path=BidPrice, StringFormat=N2}"/>
-                    <TextBlock Width="50" Text="{Binding Path=AskPrice, StringFormat=N2}"/>
-                    <TextBlock Width="25" Text="{Binding Path=AskSize}"/>
-                    <TextBlock Width="25" Text=""/>
-                    <TextBlock Width="25" Text="{Binding Path=Position, StringFormat=N0}"/>
-                    <TextBlock Width="25" Text="{Binding Path=TotalPnL, StringFormat=N2}"/>
-                    <TextBlock Width="25" Text=""/>
-                    <TextBlock Width="50" Text="{Binding Path=MarkPrice, StringFormat=N2}"/>
-                    <TextBlock Width="50" Text="{Binding Path=TodaysLowPrice, StringFormat=N2}"/>
-                    <TextBlock Width="50" Text="{Binding Path=TodaysHighPrice, StringFormat=N2}"/>
-                    <TextBlock Width="25" Text=""/>
-                    <TextBox Width="50" Text="{Binding Path=LongPrice}"/>
-                    <TextBox Width="50" Text="{Binding Path=ShortPrice}"/>
-                    <TextBox Width="50" Text="{Binding Path=RAmount}"/>
-                </StackPanel>
-            </Border>
-        </DataTemplate>
+        <Style TargetType="ListView">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        </Style>
     </views:MvxWpfView.Resources>
     
     <Grid Margin="10,15,10,10">
@@ -107,40 +80,21 @@
         </Button>
 
         <ListView Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="3"
-                  FontSize="14"
+                  FontSize="16"
                   ItemsSource="{Binding Stocks}">
-            <ListView.ItemContainerStyle>
-                <Style TargetType="ListViewItem">
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                </Style>
-            </ListView.ItemContainerStyle>
             <ListView.View>
-                
                 <GridView>
                     <GridViewColumn Header="Symbol" DisplayMemberBinding="{Binding Path=Symbol}"/>
                     <GridViewColumn Header="Exchange" DisplayMemberBinding="{Binding Path=Exchange}"/>
                     <GridViewColumn Header="PrimaryExchg" DisplayMemberBinding="{Binding Path=PrimaryExchange}"/>
                     <GridViewColumn Header="Position" DisplayMemberBinding="{Binding Path=Position, StringFormat=N0}"/>
+                    <GridViewColumn Header="UnrlPnl" DisplayMemberBinding="{Binding Path=UnrealizedPnL, StringFormat=N0}"/>
                     <GridViewColumn Header="Mark" DisplayMemberBinding="{Binding Path=MarkPrice, StringFormat=N2}"/>
                     <GridViewColumn Header="High" DisplayMemberBinding="{Binding Path=TodaysHighPrice, StringFormat=N2}"/>
                     <GridViewColumn Header="Low" DisplayMemberBinding="{Binding Path=TodaysLowPrice, StringFormat=N2}"/>
-
-                    <GridViewColumn Header="RiskAmt" Width="100">
-                        <GridViewColumn.CellTemplate >
-                            <DataTemplate>
-                                <TextBox>
-                                    <TextBox.Style>
-                                        <Style TargetType="{x:Type TextBox}">
-                                            <Setter Property="Text" Value="{Binding Path=RAmount, Mode=TwoWay, ValidatesOnDataErrors=True, UpdateSourceTrigger=Explicit}" />
-                                        </Style>
-                                    </TextBox.Style>
-                                </TextBox>
-                            </DataTemplate>
-                        </GridViewColumn.CellTemplate>
-                    </GridViewColumn>
                 </GridView>
             </ListView.View>
         </ListView>
-
+        
     </Grid>
 </views:MvxWpfView>

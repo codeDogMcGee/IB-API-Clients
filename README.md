@@ -13,7 +13,8 @@ Requires an appsettings.json file with IB connection settings:
 ```
 {
     "IbPort": "your_port",
-    "IbConnectionId": "any_integer"
+    "IbConnectionId": "any_integer",
+    "AccountNumber": "your_account_id"
 }
 ```
 

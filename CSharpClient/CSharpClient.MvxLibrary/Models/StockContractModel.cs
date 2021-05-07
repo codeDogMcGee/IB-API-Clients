@@ -23,42 +23,6 @@ namespace CSharpClient.MvxLibrary.Models
         // full properties
         // these properties have dynamic values that need to be presented to the views
 
-        private double _longPrice;
-        public double LongPrice
-        {
-            get { return _longPrice; }
-            set
-            {
-                if (value == _longPrice) return;
-                _longPrice = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LongPrice"));
-            }
-        }
-
-        private double _shortPrice;
-        public double ShortPrice
-        {
-            get { return _shortPrice; }
-            set
-            {
-                if (value == _shortPrice) return;
-                _shortPrice = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("ShortPrice"));
-            }
-        }
-
-        private double _rAmount;
-        public double RAmount
-        {
-            get { return _rAmount; }
-            set
-            {
-                if (value == _rAmount) return;
-                _rAmount = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("RAmount"));
-            }
-        }
-
         private double _position;
         public double Position
         {
@@ -110,6 +74,18 @@ namespace CSharpClient.MvxLibrary.Models
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("LastPrice"));
             }
         }
+        
+        //private double _accountValueMarkPrice;
+        //public double AccountValueMarkPrice
+        //{
+        //    get { return _accountValueMarkPrice; }
+        //    set
+        //    {
+        //        if (value == _accountValueMarkPrice) return;
+        //        _accountValueMarkPrice = value;
+        //        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("AccountValueMarkPrice"));
+        //    }
+        //}
 
         private double _markPrice;
         public double MarkPrice
