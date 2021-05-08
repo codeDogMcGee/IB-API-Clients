@@ -1,6 +1,6 @@
 ﻿using MvvmCross.Platforms.Wpf.Views;
 
-namespace StockTrader.Views
+namespace PositionViewerWPF.Views
 {
     /// <summary>
     /// Interaction logic for ContractPicker.xaml

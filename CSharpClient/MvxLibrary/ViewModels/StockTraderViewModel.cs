@@ -12,7 +12,7 @@ using System.ComponentModel;
 namespace MvxLibrary.ViewModels
 { 
 
-    public class StockTraderViewModel : MvxViewModel<NavigationArgs>
+    public class PositionViewerViewModel : MvxViewModel<NavigationArgs>
     {
         // Class variables
         private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
@@ -23,7 +23,7 @@ namespace MvxLibrary.ViewModels
         private bool _stopDataUpdateThread = false;
 
         // Contstructor
-        public StockTraderViewModel(IMvxNavigationService navigationService)
+        public PositionViewerViewModel(IMvxNavigationService navigationService)
         {
             _logger.Debug("Starting StockTraderViewModel");
 
@@ -48,14 +48,6 @@ namespace MvxLibrary.ViewModels
             {
                 SetProperty(ref _stocks, value);
                 RaisePropertyChanged(() => Stocks);
-            }
-        }
-
-        public void ShutdownHandler()
-        {
-            if (_ibClient != null)
-            {
-                ConnectToIb();
             }
         }
 

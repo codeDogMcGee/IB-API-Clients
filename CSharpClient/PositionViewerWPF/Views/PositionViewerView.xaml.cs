@@ -1,13 +1,13 @@
 ﻿using MvvmCross.Platforms.Wpf.Views;
 
-namespace StockTrader.Views
+namespace PositionViewerWPF.Views
 {
     /// <summary>
     /// Interaction logic for StockTraderView.xaml
     /// </summary>
-    public partial class StockTraderView : MvxWpfView
+    public partial class PositionViewerView : MvxWpfView
     {
-        public StockTraderView()
+        public PositionViewerView()
         {
             InitializeComponent();
 

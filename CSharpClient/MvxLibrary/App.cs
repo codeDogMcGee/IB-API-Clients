@@ -7,7 +7,7 @@ namespace MvxLibrary
     {
         public override void Initialize()
         {
-            RegisterAppStart<StockTraderViewModel>();
+            RegisterAppStart<PositionViewerViewModel>();
         }
     }
 }

@@ -1,6 +1,6 @@
 ﻿using MvvmCross.Platforms.Wpf.Views;
 
-namespace StockTrader
+namespace PositionViewerWPF
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml

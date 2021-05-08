@@ -29,7 +29,7 @@ namespace MvxLibrary.ViewModels
             ContractExchangeCommand = new MvxCommand(ToggleUserExchangeChoice);
 
             _navigationService = navigationService;
-            NavigateHomeCommand = new MvxCommand(() => _navigationService.Navigate<StockTraderViewModel, NavigationArgs>(
+            NavigateHomeCommand = new MvxCommand(() => _navigationService.Navigate<PositionViewerViewModel, NavigationArgs>(
                 new NavigationArgs
                 {
                     IbClient = _ibClient,

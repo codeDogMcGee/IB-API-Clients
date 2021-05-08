@@ -2,7 +2,7 @@
 using MvvmCross.Platforms.Wpf.Core;
 using MvvmCross.Platforms.Wpf.Views;
 
-namespace StockTrader
+namespace PositionViewerWPF
 {
     /// <summary>
     /// Interaction logic for App.xaml
