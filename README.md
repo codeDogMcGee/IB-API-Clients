@@ -18,7 +18,7 @@ Requires an appsettings.json file with IB connection settings:
 }
 ```
 
-<img src="images/StockTrader.PNG" alt="Stock Trader App" width="50%" />
+<img src="images/PositionViewer.PNG" alt="Position Viewer App" width="50%" />
 <img src="images/AddSymbol.PNG" alt="Add Symbol Page" width="50%" />
 
 ## Python Client
