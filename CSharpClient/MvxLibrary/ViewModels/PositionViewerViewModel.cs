@@ -178,19 +178,9 @@ namespace MvxLibrary.ViewModels
             _dataUpdateThread = parameter.DataUpdataThread;
             Stocks = parameter.StockList;
 
-            //// If this doesn't get reset the pnl will be messed up
-            //// when navigating back
-            //foreach (var stock in Stocks)
-            //{
-            //    stock.UnrealizedPnL = 0;
-            //}
-
             StreamDataFromStocksList();
             StartUpdatePricesThread();
         }
-
-
-        //private List<>
 
         private void UpdatePricesThread()
         {
@@ -216,18 +206,10 @@ namespace MvxLibrary.ViewModels
                             stock.TodaysHighPrice = _ibClient.StockData[stock.ContractId].Data.DailyHighPrice;
 
                             stock.Position = _ibClient.StockData[stock.ContractId].Data.Position;
-
                             
                             // IB doesn't update pnl in real time to the api so use the snapshot pricing and then adjust
-                            //if (stock.UnrealizedPnL != 0)
-                            //{
                             double pnlDiffSinceSnapshot = (stock.MarkPrice - _ibClient.StockData[stock.ContractId].Data.AccountValueMarkPrice) * stock.Position;
                             stock.UnrealizedPnL = _ibClient.StockData[stock.ContractId].Data.UnrealizedPnL + pnlDiffSinceSnapshot;
-                            //}
-                            //else
-                            //{
-                            //    stock.UnrealizedPnL = _ibClient.StockData[stock.ContractId].Data.UnrealizedPnL;
-                            //}
                         }
                     }
                     Thread.Sleep(100);

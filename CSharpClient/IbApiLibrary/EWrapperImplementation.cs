@@ -16,7 +16,7 @@ namespace IbApiLibrary
         internal readonly EReaderSignal _signal;
         internal readonly EClientSocket _clientSocket;
 
-        internal int _nextOrderId = -1;
+        internal int _orderId = -1;
 
         internal readonly Dictionary<string, int> _reqIdMap = new Dictionary<string, int> 
         {
@@ -30,6 +30,8 @@ namespace IbApiLibrary
 
         internal Dictionary<string, ExecutionsModel> _executions = new Dictionary<string, ExecutionsModel>();
         internal bool _receivingExecutionsInProgress;
+
+        internal Dictionary<int, OrderModel> _open_orders = new Dictionary<int, OrderModel>();
 
         public List<StockContractModel> _symbolLookupStocks = new List<StockContractModel>();
         
@@ -52,6 +54,7 @@ namespace IbApiLibrary
 
         public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
         {
+            
             throw new NotImplementedException();
         }
 
@@ -197,6 +200,21 @@ namespace IbApiLibrary
 
                 // reinsert the trade into the dictionary
                 _executions[commissionReport.ExecId] = trade;
+
+                _fillsLogger.Debug("{Symbol},{SecurityType},{ExecutionId},{Exchange},{OrderId},{ClientId},{AccountNumber},{AveragePrice},{CumulativeQty},{Currency},{Commission},{RealizedPnL}",
+                    trade.Contract.Symbol,
+                    trade.Contract.SecType,
+                    trade.Execution.ExecId,
+                    trade.Execution.Exchange,
+                    trade.Execution.OrderId,
+                    trade.Execution.ClientId,
+                    trade.Execution.AcctNumber,
+                    trade.Execution.AvgPrice,
+                    trade.Execution.CumQty,
+                    trade.CommissionReport.Currency,
+                    trade.CommissionReport.Commission,
+                    trade.CommissionReport.RealizedPNL
+                );
             }
 
         }
@@ -333,7 +351,7 @@ namespace IbApiLibrary
 
         public void nextValidId(int orderId)
         {
-            _nextOrderId = orderId;
+            _orderId = orderId;
         }
 
         public void managedAccounts(string accountsList)

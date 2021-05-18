@@ -16,7 +16,9 @@ namespace IbApiLibrary
     public class IbClient
     {
         private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
-
+        private readonly string _account;
+        private readonly int _port;
+        private readonly int _connectionId;
         private static IConfiguration _config;
         private static EWrapperImplementation _ibConnection;
         private static EClientSocket _clientSocket;
@@ -30,8 +32,9 @@ namespace IbApiLibrary
             _ibConnection = new EWrapperImplementation();
             _clientSocket = _ibConnection._clientSocket;
             _readerSignal = _ibConnection._signal;
-         
-
+            _account = _config.GetValue<string>("AccountNumber");
+            _port = _config.GetValue<int>("IbPort");
+            _connectionId = _config.GetValue<int>("IbConnectionId");
         }
 
         public bool IsConnected { get; private set; }
@@ -51,6 +54,7 @@ namespace IbApiLibrary
 
             Order order = new Order
             {
+                Account = _account,
                 Action = buyOrSell.ToUpper(),
                 OrderType = "TRAIL LIMIT",
                 TotalQuantity = orderQuantity,
@@ -58,10 +62,27 @@ namespace IbApiLibrary
                 LmtPriceOffset = limitPriceOffset,
                 AuxPrice = trailingAmount,
                 OcaType = ocaType,
-                OcaGroup = ocaGroupName
+                OcaGroup = ocaGroupName,
+                Transmit = false
             };
 
-            _clientSocket.placeOrder(_ibConnection._nextOrderId++, contract, order);
+            int orderId = _ibConnection._orderId++;
+            _clientSocket.placeOrder(orderId, contract, order);
+            _logger.Info("Placed TRAIL LMT order for {Account}: {Symbol} {Exchange} {Action} {Quantity} {StopPrice} {TrailAmount} {LmtOffset} {OrderId}",
+                order.Account,
+                stockContract.Symbol, 
+                stockContract.Exchange,
+                order.Action,
+                order.TotalQuantity,
+                order.TrailStopPrice,
+                order.AuxPrice,
+                order.LmtPriceOffset,
+                orderId);
+        }
+
+        public void CancelWorkingOrder(int orderId)
+        {
+            _clientSocket.cancelOrder(orderId);
         }
 
         public string GetMatchingStockSymbolsFromIB(string patternToMatch)
@@ -132,12 +153,9 @@ namespace IbApiLibrary
 
         public void ConnectToIb()
         {
-            int ibPort = _config.GetValue<int>("IbPort");
-            int ibConnectionId = _config.GetValue<int>("IbConnectionId");
-
             string host = "127.0.0.1";
 
-            _clientSocket.eConnect(host, ibPort, ibConnectionId);
+            _clientSocket.eConnect(host, _port, _connectionId);
 
             // after connecting to ib start the reader
             InitializeEReader();
@@ -198,7 +216,7 @@ namespace IbApiLibrary
             DateTime timeoutTime = DateTime.Now + TimeSpan.FromSeconds(timeoutSeconds);
 
 
-            while (_ibConnection._nextOrderId <= 0)
+            while (_ibConnection._orderId <= 0)
             {
                 if (DateTime.Now > timeoutTime)
                 {
