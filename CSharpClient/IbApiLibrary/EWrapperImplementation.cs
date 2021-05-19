@@ -10,6 +10,7 @@ namespace IbApiLibrary
 {
     public class EWrapperImplementation : EWrapper
     {
+        // Fields
         private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
         private static readonly NLog.Logger _fillsLogger = NLog.LogManager.GetLogger("FillsLog");
 
@@ -24,43 +25,82 @@ namespace IbApiLibrary
             { "GetMatchingStockSymbolsFromIB", 20002 }
         };
 
-        public readonly Dictionary<int, StockDataModel> StockData = new Dictionary<int, StockDataModel>();
+        internal readonly Dictionary<int, StockDataModel> StockData = new Dictionary<int, StockDataModel>();
 
-        public readonly AccountDataModel AccountData = new AccountDataModel();
-
+        internal readonly AccountDataModel AccountData = new AccountDataModel();
         internal Dictionary<string, ExecutionsModel> _executions = new Dictionary<string, ExecutionsModel>();
-        internal bool _receivingExecutionsInProgress;
+        internal Dictionary<int, OrderModel> _openOrders = new Dictionary<int, OrderModel>();
+        internal List<StockContractModel> _symbolLookupStocks = new List<StockContractModel>();
+        private readonly int _clientId;
 
-        internal Dictionary<int, OrderModel> _open_orders = new Dictionary<int, OrderModel>();
-
-        public List<StockContractModel> _symbolLookupStocks = new List<StockContractModel>();
-        
         // Constructor
-        public EWrapperImplementation()
+        public EWrapperImplementation(int clientId)
         {
             _signal = new EReaderMonitorSignal();
             _clientSocket = new EClientSocket(this, _signal);
+            _clientId = clientId;
         }
-        
+
         // Properties
-        public DateTime LastAccountUpdateTime { get; private set; } = new DateTime(1, 1, 1);
-        public bool AccountDataFinishedDownloading { get; private set; } = false;
+        internal DateTime LastAccountUpdateTime { get; private set; } = new DateTime(1, 1, 1);
+        internal bool AccountDataFinishedDownloading { get; private set; } = false;
+        internal bool ReceivingExecutionsInProgress { get; set; } = false;
+        internal bool ReceivingOpenOrdersInProgress { get; set; } = false;
 
         // Methods
         public void orderStatus(int orderId, string status, double filled, double remaining, double avgFillPrice, int permId, int parentId, double lastFillPrice, int clientId, string whyHeld, double mktCapPrice)
         {
-            throw new NotImplementedException();
+            if (clientId == _clientId)
+            {
+                if (_openOrders.ContainsKey(orderId))
+                {
+                    // Update the open order's status
+
+                    if (status == "Cancelled" || status == "Closed")
+                    {
+                        _openOrders.Remove(orderId);
+                    }
+                    else
+                    {
+                        OrderStatusModel orderStatus = _openOrders[orderId].Status;
+                        orderStatus.Status = status;
+                        orderStatus.Filled = filled;
+                        orderStatus.Remaining = remaining;
+                        orderStatus.AvgFillPrice = avgFillPrice;
+                        orderStatus.PermId = permId;
+                        orderStatus.ParentId = parentId;
+                        orderStatus.LastFillPrice = lastFillPrice;
+                        orderStatus.ClientId = clientId;
+                        orderStatus.WhyHeld = whyHeld;
+                        orderStatus.MktCapPrice = mktCapPrice;
+                    }
+                }
+            }
         }
 
         public void openOrder(int orderId, Contract contract, Order order, OrderState orderState)
         {
-            
-            throw new NotImplementedException();
+            OrderStatusModel orderStatus = new OrderStatusModel
+            {
+                Status = orderState.Status
+            };
+
+            OrderModel newOrder = new OrderModel
+            {
+                Contract = contract,
+                Order = order,
+                Status = orderStatus
+            };
+
+            if (_openOrders.ContainsKey(orderId) is false)
+            {
+                _openOrders.Add(orderId, newOrder);
+            }    
         }
 
         public void openOrderEnd()
         {
-            throw new NotImplementedException();
+            ReceivingOpenOrdersInProgress = false;
         }
 
         public void updateAccountValue(string key, string value, string currency, string accountName)
@@ -121,12 +161,6 @@ namespace IbApiLibrary
             }
             else
             {
-                // The portfolio will typically be updated before stocks are added individually
-                // so this will populate the StockData dict with the existing positions
-
-                // TODO: make this a setting in the gui, maybe the user wants to add stocks 
-                //       individually instead of having them populate automatically
-
                 DataModel data = new DataModel
                 {
                     Position = position,
@@ -184,7 +218,7 @@ namespace IbApiLibrary
         {
             if (reqId == _reqIdMap["GetAllExecutions"])
             {
-                _receivingExecutionsInProgress = false;
+                ReceivingExecutionsInProgress = false;
             }
         }
 
@@ -261,9 +295,15 @@ namespace IbApiLibrary
 
         public void error(int id, int errorCode, string errorMsg)
         {
+            List<int> warningCodes = new List<int> { 399, 202 };
+
             if (id == -1)
             {
                 _logger.Info($"TWS Connection Info: {errorCode} {errorMsg}");
+            }
+            else if (warningCodes.Contains(errorCode))
+            {
+                _logger.Warn("{ErrorCode} {ErrorId} {ErrorMessage}", errorCode, id, errorMsg);
             }
             else
             {

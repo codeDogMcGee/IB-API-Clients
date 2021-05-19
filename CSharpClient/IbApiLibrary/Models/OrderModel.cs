@@ -6,6 +6,6 @@ namespace IbApiLibrary.Models
     {
         public Contract Contract { get; set; }
         public Order Order { get; set; }
-        public OrderState OrderState { get; set; }
+        public OrderStatusModel Status { get; set; }
     }
 }

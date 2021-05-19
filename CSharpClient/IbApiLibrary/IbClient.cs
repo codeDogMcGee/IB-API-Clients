@@ -8,13 +8,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using System.Threading;
 
 namespace IbApiLibrary
 {
     public class IbClient
     {
+        // Fields
         private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
         private readonly string _account;
         private readonly int _port;
@@ -25,22 +25,27 @@ namespace IbApiLibrary
         private static EReaderSignal _readerSignal;
         private static EReader _reader;  //Create a reader to consume messages from the TWS. The EReader will consume the incoming messages and put them in a queue
 
+        // Constructor
         public IbClient()
         {
             InitializeConfiguration();
 
-            _ibConnection = new EWrapperImplementation();
-            _clientSocket = _ibConnection._clientSocket;
-            _readerSignal = _ibConnection._signal;
             _account = _config.GetValue<string>("AccountNumber");
             _port = _config.GetValue<int>("IbPort");
             _connectionId = _config.GetValue<int>("IbConnectionId");
+
+            _ibConnection = new EWrapperImplementation(_connectionId);
+            _clientSocket = _ibConnection._clientSocket;
+            _readerSignal = _ibConnection._signal;
+
         }
 
+        // Properties
         public bool IsConnected { get; private set; }
-        public Dictionary<int, StockDataModel> StockData { get { return _ibConnection.StockData; } }
+        public Dictionary<int, StockDataModel> StockData => _ibConnection.StockData;
 
-        public void PlaceTrailingStopOrder(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double trailingAmount, double trailingStopPrice, double limitPriceOffset, int ocaType = 2, string ocaGroupName = "")
+        // Public Methods
+        public int PlaceTrailingStopOrder(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double trailingAmount, double trailingStopPrice, double limitPriceOffset, int ocaType = 2, string ocaGroupName = "")
         {
             Contract contract = new Contract
             {
@@ -63,10 +68,12 @@ namespace IbApiLibrary
                 AuxPrice = trailingAmount,
                 OcaType = ocaType,
                 OcaGroup = ocaGroupName,
-                Transmit = false
+                Transmit = true
             };
 
+            // An existing orderId is sent to modify an order
             int orderId = _ibConnection._orderId++;
+            
             _clientSocket.placeOrder(orderId, contract, order);
             _logger.Info("Placed TRAIL LMT order for {Account}: {Symbol} {Exchange} {Action} {Quantity} {StopPrice} {TrailAmount} {LmtOffset} {OrderId}",
                 order.Account,
@@ -78,11 +85,37 @@ namespace IbApiLibrary
                 order.AuxPrice,
                 order.LmtPriceOffset,
                 orderId);
+
+            return orderId;
         }
 
-        public void CancelWorkingOrder(int orderId)
+        public void ModifyTrailingStopOrderPrice(int orderId, double trailingAmount, double trailingStopPrice, double limitPriceOffset)
+        {
+            // get the existing order and only modify the pricing parameters, then resend
+            OrderModel order = _ibConnection._openOrders[orderId];
+
+            order.Order.AuxPrice = trailingAmount;
+            order.Order.TrailStopPrice = trailingStopPrice;
+            order.Order.LmtPriceOffset = limitPriceOffset;
+
+            _clientSocket.placeOrder(orderId, order.Contract, order.Order);
+            _logger.Info("Modified TRAIL LMT order for {Account}: {Symbol} {Exchange} {Action} {Quantity} {StopPrice} {TrailAmount} {LmtOffset} {OrderId}",
+                order.Order.Account,
+                order.Contract.Symbol,
+                order.Contract.Exchange,
+                order.Order.Action,
+                order.Order.TotalQuantity,
+                order.Order.TrailStopPrice,
+                order.Order.AuxPrice,
+                order.Order.LmtPriceOffset,
+                orderId);
+        }
+
+        public int CancelOrderById(int orderId)
         {
             _clientSocket.cancelOrder(orderId);
+            _logger.Info("Canceled order {OrderId}", orderId);
+            return -1;
         }
 
         public string GetMatchingStockSymbolsFromIB(string patternToMatch)
@@ -109,12 +142,12 @@ namespace IbApiLibrary
 
         public string GetAllExecutions()
         {
-            _ibConnection._receivingExecutionsInProgress = true;
+            _ibConnection.ReceivingExecutionsInProgress = true;
             _clientSocket.reqExecutions(
                 _ibConnection._reqIdMap["GetAllExecutions"],
                 new ExecutionFilter());
 
-            while (_ibConnection._receivingExecutionsInProgress) { }  // wait for the receive exeutions to finish before proceeding
+            while (_ibConnection.ReceivingExecutionsInProgress) { }  // wait for the receive exeutions to finish before proceeding
 
             List<Dictionary<string, string>> output = new List<Dictionary<string, string>>();
             foreach (var execution in _ibConnection._executions)
@@ -165,7 +198,7 @@ namespace IbApiLibrary
 
             IsConnected = true;
 
-            _logger.Info("Connected to IB TWS host: {host}, port: {ibPort}, ConnectionId: {ibConnectionId}", host, ibPort, ibConnectionId);
+            _logger.Info("Connected to IB TWS host: {host}, port: {ibPort}, ConnectionId: {ibConnectionId}", host, _port, _connectionId);
         }
 
         public void DisconnectIbSocket()
@@ -177,16 +210,24 @@ namespace IbApiLibrary
 
         public void RequestAccountUpdates()
         {
-            _clientSocket.reqAccountUpdates(true, _config.GetValue<string>("AccountNumber"));
-            
+            string accountNumber = _config.GetValue<string>("AccountNumber");
+
+            _clientSocket.reqAccountUpdates(true, accountNumber);
+
+            _logger.Debug("Requesting account updates for {Account}", accountNumber);
+
             while (_ibConnection.AccountDataFinishedDownloading is false) { }
         }
 
-        private static void RequestOpenOrders()
+        public void RequestOpenOrders()
         {
+            _ibConnection.ReceivingOpenOrdersInProgress = true;
             _clientSocket.reqOpenOrders();
+            _logger.Debug("Requesting open orders.");
+            while (_ibConnection.ReceivingOpenOrdersInProgress) { }
         }
 
+        // Private Methods
         private static void InitializeEReader()
         {
             _reader = new EReader(_clientSocket, _readerSignal);
