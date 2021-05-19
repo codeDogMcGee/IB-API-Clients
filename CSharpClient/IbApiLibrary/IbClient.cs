@@ -43,8 +43,70 @@ namespace IbApiLibrary
         // Properties
         public bool IsConnected { get; private set; }
         public Dictionary<int, StockDataModel> StockData => _ibConnection.StockData;
+        public long LastOrderSentTimestamp { get; private set; }
 
         // Public Methods
+        public int IsOrderCorrectSize(int orderId, double sizeItShoudBe)
+        {
+            // returns -1 for false, 1 for true, and 0 for unknown
+            int output = 0;
+
+            if (_ibConnection._openOrders.ContainsKey(orderId))
+            {
+                double total = _ibConnection._openOrders[orderId].Order.TotalQuantity;
+                //double filled = _ibConnection._openOrders[orderId].Order.FilledQuantity;
+
+                if (Math.Round(total, 4) == Math.Round(sizeItShoudBe, 4))
+                {
+                    output = 1;
+                }
+                else
+                {
+                    output = -1;
+                }
+            }
+            return output;
+        }
+
+        public int PlaceLimitOrder(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double limitPrice, int ocaType = 2, string ocaGroupName = "")
+        {
+            Contract contract = new Contract
+            {
+                ConId = stockContract.ContractId,
+                Symbol = stockContract.Symbol,
+                SecIdType = stockContract.SecurityType,
+                Exchange = stockContract.Exchange,
+                PrimaryExch = stockContract.PrimaryExchange,
+                Currency = stockContract.Currency
+            };
+
+            Order order = new Order
+            {
+                Account = _account,
+                Action = buyOrSell.ToUpper(),
+                OrderType = "LMT",
+                TotalQuantity = orderQuantity,
+                LmtPrice = limitPrice,
+                OcaType = ocaType,
+                OcaGroup = ocaGroupName,
+                Transmit = true
+            };
+
+            int orderId = _ibConnection._orderId++;
+            _clientSocket.placeOrder(orderId, contract, order);
+            _logger.Info("Place LMT order for {Account}: Symbol={Symbol} Exchange={Exchange} Action={Action} Qty={Quantity} Price={LimitPrice} OrderId={OrderId}",
+                order.Account,
+                stockContract.Symbol,
+                stockContract.Exchange,
+                order.Action,
+                order.TotalQuantity,
+                order.LmtPrice,
+                orderId);
+
+            LastOrderSentTimestamp = GetUtcTimeStamp();
+            return orderId;
+        }
+
         public int PlaceTrailingStopOrder(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double trailingAmount, double trailingStopPrice, double limitPriceOffset, int ocaType = 2, string ocaGroupName = "")
         {
             Contract contract = new Contract
@@ -71,11 +133,9 @@ namespace IbApiLibrary
                 Transmit = true
             };
 
-            // An existing orderId is sent to modify an order
             int orderId = _ibConnection._orderId++;
-            
             _clientSocket.placeOrder(orderId, contract, order);
-            _logger.Info("Placed TRAIL LMT order for {Account}: {Symbol} {Exchange} {Action} {Quantity} {StopPrice} {TrailAmount} {LmtOffset} {OrderId}",
+            _logger.Info("Place TRAIL LMT order for {Account}: Symbol={Symbol} Exchange={Exchange} Action={Action} Qty={Quantity} StopPrice={StopPrice} TrailingAmt={TrailAmount} LimitOffset={LmtOffset} OrderId={OrderId}",
                 order.Account,
                 stockContract.Symbol, 
                 stockContract.Exchange,
@@ -86,20 +146,20 @@ namespace IbApiLibrary
                 order.LmtPriceOffset,
                 orderId);
 
+            LastOrderSentTimestamp = GetUtcTimeStamp();
             return orderId;
         }
 
-        public void ModifyTrailingStopOrderPrice(int orderId, double trailingAmount, double trailingStopPrice, double limitPriceOffset)
+        public void ModifyTrailingStopOrderPrice(int orderId, double trailingAmount)
         {
             // get the existing order and only modify the pricing parameters, then resend
             OrderModel order = _ibConnection._openOrders[orderId];
 
             order.Order.AuxPrice = trailingAmount;
-            order.Order.TrailStopPrice = trailingStopPrice;
-            order.Order.LmtPriceOffset = limitPriceOffset;
+            order.Order.LmtPrice = 0; // Must remove LmtPrice setting since LmtPriceOffset already has a value. Can't set both.
 
             _clientSocket.placeOrder(orderId, order.Contract, order.Order);
-            _logger.Info("Modified TRAIL LMT order for {Account}: {Symbol} {Exchange} {Action} {Quantity} {StopPrice} {TrailAmount} {LmtOffset} {OrderId}",
+            _logger.Info("Modify TRAIL LMT order for {Account}: Symbol={Symbol} Exchange={Exchange} Action={Action} Qty={Quantity} StopPrice={StopPrice} TrailingAmt={TrailAmount} LimitOffset={LmtOffset} OrderId={OrderId}",
                 order.Order.Account,
                 order.Contract.Symbol,
                 order.Contract.Exchange,
@@ -109,6 +169,31 @@ namespace IbApiLibrary
                 order.Order.AuxPrice,
                 order.Order.LmtPriceOffset,
                 orderId);
+
+            LastOrderSentTimestamp = GetUtcTimeStamp();
+        }
+
+        public void ModifyTrailingStopOrderQuantity(int orderId, double newQuantity)
+        {
+            // get the existing order and only modify the pricing parameters, then resend
+            OrderModel order = _ibConnection._openOrders[orderId];
+
+            order.Order.TotalQuantity = newQuantity;
+            order.Order.LmtPrice = 0; // Must remove LmtPrice setting since LmtPriceOffset already has a value. Can't set both.
+
+            _clientSocket.placeOrder(orderId, order.Contract, order.Order);
+            _logger.Info("Modify TRAIL LMT order for {Account}: Symbol={Symbol} Exchange={Exchange} Action={Action} Qty={Quantity} StopPrice={StopPrice} TrailingAmt={TrailAmount} LimitOffset={LmtOffset} OrderId={OrderId}",
+                order.Order.Account,
+                order.Contract.Symbol,
+                order.Contract.Exchange,
+                order.Order.Action,
+                order.Order.TotalQuantity,
+                order.Order.TrailStopPrice,
+                order.Order.AuxPrice,
+                order.Order.LmtPriceOffset,
+                orderId);
+
+            LastOrderSentTimestamp = GetUtcTimeStamp();
         }
 
         public int CancelOrderById(int orderId)
@@ -211,11 +296,8 @@ namespace IbApiLibrary
         public void RequestAccountUpdates()
         {
             string accountNumber = _config.GetValue<string>("AccountNumber");
-
             _clientSocket.reqAccountUpdates(true, accountNumber);
-
             _logger.Debug("Requesting account updates for {Account}", accountNumber);
-
             while (_ibConnection.AccountDataFinishedDownloading is false) { }
         }
 
@@ -225,6 +307,12 @@ namespace IbApiLibrary
             _clientSocket.reqOpenOrders();
             _logger.Debug("Requesting open orders.");
             while (_ibConnection.ReceivingOpenOrdersInProgress) { }
+        }
+
+        public long GetUtcTimeStamp()
+        {
+            DateTimeOffset dateTimeOffset = DateTimeOffset.UtcNow;
+            return dateTimeOffset.ToUnixTimeSeconds();
         }
 
         // Private Methods

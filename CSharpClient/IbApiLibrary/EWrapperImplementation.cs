@@ -27,7 +27,7 @@ namespace IbApiLibrary
 
         internal readonly Dictionary<int, StockDataModel> StockData = new Dictionary<int, StockDataModel>();
 
-        internal readonly AccountDataModel AccountData = new AccountDataModel();
+        internal readonly AccountDataModel _accountData = new AccountDataModel();
         internal Dictionary<string, ExecutionsModel> _executions = new Dictionary<string, ExecutionsModel>();
         internal Dictionary<int, OrderModel> _openOrders = new Dictionary<int, OrderModel>();
         internal List<StockContractModel> _symbolLookupStocks = new List<StockContractModel>();
@@ -56,7 +56,7 @@ namespace IbApiLibrary
                 {
                     // Update the open order's status
 
-                    if (status == "Cancelled" || status == "Closed")
+                    if (status == "Cancelled" || status == "Closed" || status == "Filled")
                     {
                         _openOrders.Remove(orderId);
                     }
@@ -119,28 +119,28 @@ namespace IbApiLibrary
             switch (key)
             {
                 case "AccountCode":
-                    AccountData.AccountId = value;
+                    _accountData.AccountId = value;
                     break;
                 case "AvailableFunds":
-                    AccountData.AvailableFunds = value;
+                    _accountData.AvailableFunds = value;
                     break;
                 case "Currency":
-                    AccountData.Currency = value;
+                    _accountData.Currency = value;
                     break;
                 case "InitMarginReq":
-                    AccountData.InitialMarginReq = value;
+                    _accountData.InitialMarginReq = value;
                     break;
                 case "GrossPositionValue":
-                    AccountData.GrossPositionsValue = value;
+                    _accountData.GrossPositionsValue = value;
                     break;
                 case "NetLiquidation":
-                    AccountData.NetLiquidationValue = value;
+                    _accountData.NetLiquidationValue = value;
                     break;
                 case "RealizedPnL":
-                    AccountData.RealizedPnL = value;
+                    _accountData.RealizedPnL = value;
                     break;
                 case "UnrealizedPnL":
-                    AccountData.UnrealizedPnL = value;
+                    _accountData.UnrealizedPnL = value;
                     break;
                 default:
                     // ignore if not being handled
@@ -201,7 +201,7 @@ namespace IbApiLibrary
 
         public void execDetails(int reqId, Contract contract, Execution execution)
         {
-            if (reqId == _reqIdMap["GetAllExecutions"])
+            if (reqId == _reqIdMap["GetAllExecutions"] || execution.ClientId == _clientId)
             {
                 ExecutionsModel trade = new ExecutionsModel
                 {
@@ -235,19 +235,26 @@ namespace IbApiLibrary
                 // reinsert the trade into the dictionary
                 _executions[commissionReport.ExecId] = trade;
 
-                _fillsLogger.Debug("{Symbol},{SecurityType},{ExecutionId},{Exchange},{OrderId},{ClientId},{AccountNumber},{AveragePrice},{CumulativeQty},{Currency},{Commission},{RealizedPnL}",
+                // Add a header row to the fills log
+                if (_executions.Count == 1)
+                {
+                    _fillsLogger.Debug("Symbol,Side,CumulativeQty,AveragePrice,Commission,RealizedPnL,AccountNumber,SecurityType,Currency,Exchange,ClientId,ExecutionId,OrderId");
+                }
+
+                _fillsLogger.Debug("{Symbol},{Side},{CumulativeQty},{AveragePrice},{Commission},{RealizedPnL},{AccountNumber},{SecurityType},{Currency},{Exchange},{ClientId},{ExecutionId},{OrderId}",
                     trade.Contract.Symbol,
-                    trade.Contract.SecType,
-                    trade.Execution.ExecId,
-                    trade.Execution.Exchange,
-                    trade.Execution.OrderId,
-                    trade.Execution.ClientId,
-                    trade.Execution.AcctNumber,
-                    trade.Execution.AvgPrice,
+                    trade.Execution.Side,
                     trade.Execution.CumQty,
-                    trade.CommissionReport.Currency,
+                    trade.Execution.AvgPrice,
                     trade.CommissionReport.Commission,
-                    trade.CommissionReport.RealizedPNL
+                    trade.CommissionReport.RealizedPNL,
+                    trade.Execution.AcctNumber,
+                    trade.Contract.SecType,
+                    trade.CommissionReport.Currency,
+                    trade.Execution.Exchange,
+                    trade.Execution.ClientId,
+                    trade.Execution.ExecId,
+                    trade.Execution.OrderId
                 );
             }
 
