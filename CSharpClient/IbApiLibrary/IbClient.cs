@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace IbApiLibrary
 {
@@ -16,14 +17,16 @@ namespace IbApiLibrary
     {
         // Fields
         private static readonly NLog.Logger _logger = NLog.LogManager.GetLogger("MainLog");
-        private readonly string _account;
-        private readonly int _port;
-        private readonly int _connectionId;
+        
         private static IConfiguration _config;
         private static EWrapperImplementation _ibConnection;
         private static EClientSocket _clientSocket;
         private static EReaderSignal _readerSignal;
         private static EReader _reader;  //Create a reader to consume messages from the TWS. The EReader will consume the incoming messages and put them in a queue
+
+        private readonly string _account;
+        private readonly int _port;
+        private readonly int _connectionId;
 
         // Constructor
         public IbClient()
@@ -44,6 +47,20 @@ namespace IbApiLibrary
         public bool IsConnected { get; private set; }
         public Dictionary<int, StockDataModel> StockData => _ibConnection.StockData;
         public long LastOrderSentTimestamp { get; private set; }
+        public List<int> OpenOrderIds 
+        {
+            get
+            {
+                if (_ibConnection._openOrders.Keys.Count > 0)
+                {
+                    return _ibConnection._openOrders.Keys.ToList<int>();
+                }
+                else
+                {
+                    return new List<int>();
+                }
+            } 
+        }
 
         // Public Methods
         public int IsOrderCorrectSize(int orderId, double sizeItShoudBe)
@@ -65,6 +82,97 @@ namespace IbApiLibrary
                     output = -1;
                 }
             }
+            return output;
+        }
+
+        public async Task<int> PlaceLimitOrderAsync(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double limitPrice, int ocaType = 2, string ocaGroupName = "")
+        {
+            Contract contract = new Contract
+            {
+                ConId = stockContract.ContractId,
+                Symbol = stockContract.Symbol,
+                SecIdType = stockContract.SecurityType,
+                Exchange = stockContract.Exchange,
+                PrimaryExch = stockContract.PrimaryExchange,
+                Currency = stockContract.Currency
+            };
+
+            Order order = new Order
+            {
+                Account = _account,
+                Action = buyOrSell.ToUpper(),
+                OrderType = "LMT",
+                TotalQuantity = orderQuantity,
+                LmtPrice = limitPrice,
+                OcaType = ocaType,
+                OcaGroup = ocaGroupName,
+                Transmit = true
+            };
+
+            int orderId = _ibConnection._orderId++;
+            _clientSocket.placeOrder(orderId, contract, order);
+
+            LastOrderSentTimestamp = GetUtcTimeStamp();
+
+            var output = await WaitForOrderAck(orderId);
+
+            _logger.Info("Place LMT order for {Account}: Symbol={Symbol} Exchange={Exchange} Action={Action} Qty={Quantity} Price={LimitPrice} OrderId={OrderId}",
+                order.Account,
+                stockContract.Symbol,
+                stockContract.Exchange,
+                order.Action,
+                order.TotalQuantity,
+                order.LmtPrice,
+                orderId);
+
+            
+            return output;
+        }
+
+        public async Task<int> PlaceTrailingStopOrderAsync(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double trailingAmount, double trailingStopPrice, double limitPriceOffset, int ocaType = 2, string ocaGroupName = "")
+        {
+            Contract contract = new Contract
+            {
+                ConId = stockContract.ContractId,
+                Symbol = stockContract.Symbol,
+                SecIdType = stockContract.SecurityType,
+                Exchange = stockContract.Exchange,
+                PrimaryExch = stockContract.PrimaryExchange,
+                Currency = stockContract.Currency
+            };
+
+            Order order = new Order
+            {
+                Account = _account,
+                Action = buyOrSell.ToUpper(),
+                OrderType = "TRAIL LIMIT",
+                TotalQuantity = orderQuantity,
+                TrailStopPrice = trailingStopPrice,
+                LmtPriceOffset = limitPriceOffset,
+                AuxPrice = trailingAmount,
+                OcaType = ocaType,
+                OcaGroup = ocaGroupName,
+                Transmit = true
+            };
+
+            int orderId = _ibConnection._orderId++;
+            _clientSocket.placeOrder(orderId, contract, order);
+
+            LastOrderSentTimestamp = GetUtcTimeStamp();
+
+            var output = await WaitForOrderAck(orderId);
+
+            _logger.Info("Place TRAIL LMT order for {Account}: Symbol={Symbol} Exchange={Exchange} Action={Action} Qty={Quantity} StopPrice={StopPrice} TrailingAmt={TrailAmount} LimitOffset={LmtOffset} OrderId={OrderId}",
+                order.Account,
+                stockContract.Symbol,
+                stockContract.Exchange,
+                order.Action,
+                order.TotalQuantity,
+                order.TrailStopPrice,
+                order.AuxPrice,
+                order.LmtPriceOffset,
+                orderId);
+
             return output;
         }
 
@@ -203,6 +311,33 @@ namespace IbApiLibrary
             return -1;
         }
 
+        public async Task<int> CancelOrderByIdAsync(int orderId)
+        {
+            _clientSocket.cancelOrder(orderId);
+            var output = await WaitForOrderCancelAck(orderId);
+            _logger.Info("Canceled order {OrderId}", orderId);
+            return output;
+        }
+
+        public async void CancelAllOrdersAsync()
+        {
+            List<int> canceledOrders = new List<int>();
+
+            // first send all of the cancels to the api
+            foreach (int orderId in _ibConnection._openOrders.Keys)
+            {
+                _clientSocket.cancelOrder(orderId);
+                canceledOrders.Add(orderId);
+            }
+
+            // then wait for the cancel confirmations
+            foreach (int canceledOrder in canceledOrders)
+            {
+                _ = await WaitForOrderCancelAck(canceledOrder);
+                _logger.Info("Canceled order {OrderId}", canceledOrder);
+            }
+        }
+
         public string GetMatchingStockSymbolsFromIB(string patternToMatch)
         {
             _clientSocket.reqMatchingSymbols(
@@ -316,6 +451,46 @@ namespace IbApiLibrary
         }
 
         // Private Methods
+        private Task<int> WaitForOrderAck(int orderId)
+        {
+            int timeoutSeconds = 3;
+
+            long startTime = GetUtcTimeStamp();
+            long timeoutTimestamp = startTime + timeoutSeconds;
+
+            while (_ibConnection._openOrders.Count == 0 || _ibConnection._openOrders.ContainsKey(orderId) is false)
+            {
+                long nowTimestamp = GetUtcTimeStamp();
+                if (nowTimestamp > timeoutTimestamp)
+                {
+                    _logger.Error("IB WaitForOrderAck for {SecondsWaiting} seconds", nowTimestamp);
+                    Thread.Sleep(1000);
+                }
+            }
+
+            return Task.FromResult(orderId);
+        }
+
+        private Task<int> WaitForOrderCancelAck(int orderId)
+        {
+            int timeoutSeconds = 3;
+
+            long startTime = GetUtcTimeStamp();
+            long timeoutTimestamp = startTime + timeoutSeconds;
+
+            while (_ibConnection._openOrders.ContainsKey(orderId) is true)
+            {
+                long nowTimestamp = GetUtcTimeStamp();
+                if (nowTimestamp > timeoutTimestamp)
+                {
+                    _logger.Error("IB WaitForOrderCancelAck for {SecondsWaiting} seconds", nowTimestamp);
+                    Thread.Sleep(1000);
+                }
+            }
+
+            return Task.FromResult(-1);
+        }
+
         private static void InitializeEReader()
         {
             _reader = new EReader(_clientSocket, _readerSignal);

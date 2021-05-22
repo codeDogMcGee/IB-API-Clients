@@ -235,12 +235,6 @@ namespace IbApiLibrary
                 // reinsert the trade into the dictionary
                 _executions[commissionReport.ExecId] = trade;
 
-                // Add a header row to the fills log
-                if (_executions.Count == 1)
-                {
-                    _fillsLogger.Debug("Symbol,Side,CumulativeQty,AveragePrice,Commission,RealizedPnL,AccountNumber,SecurityType,Currency,Exchange,ClientId,ExecutionId,OrderId");
-                }
-
                 _fillsLogger.Debug("{Symbol},{Side},{CumulativeQty},{AveragePrice},{Commission},{RealizedPnL},{AccountNumber},{SecurityType},{Currency},{Exchange},{ClientId},{ExecutionId},{OrderId}",
                     trade.Contract.Symbol,
                     trade.Execution.Side,
