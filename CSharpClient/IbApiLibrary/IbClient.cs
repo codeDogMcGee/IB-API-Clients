@@ -33,9 +33,9 @@ namespace IbApiLibrary
         {
             InitializeConfiguration();
 
-            _account = _config.GetValue<string>("AccountNumber");
-            _port = _config.GetValue<int>("IbPort");
-            _connectionId = _config.GetValue<int>("IbConnectionId");
+            _account = _config.GetValue<string>("IbSettings:AccountNumber");
+            _port = _config.GetValue<int>("IbSettings:IbPort");
+            _connectionId = _config.GetValue<int>("IbSettings:IbConnectionId");
 
             _ibConnection = new EWrapperImplementation(_connectionId);
             _clientSocket = _ibConnection._clientSocket;
@@ -85,7 +85,7 @@ namespace IbApiLibrary
             return output;
         }
 
-        public async Task<int> PlaceLimitOrderAsync(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double limitPrice, int ocaType = 2, string ocaGroupName = "")
+        public async Task<int> PlaceLimitOrderAsyncTask(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double limitPrice, int ocaType = 2, string ocaGroupName = "")
         {
             Contract contract = new Contract
             {
@@ -129,7 +129,7 @@ namespace IbApiLibrary
             return output;
         }
 
-        public async Task<int> PlaceTrailingStopOrderAsync(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double trailingAmount, double trailingStopPrice, double limitPriceOffset, int ocaType = 2, string ocaGroupName = "")
+        public async Task<int> PlaceTrailingStopOrderAsyncTask(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double trailingAmount, double trailingStopPrice, double limitPriceOffset, int ocaType = 2, string ocaGroupName = "")
         {
             Contract contract = new Contract
             {
@@ -174,6 +174,27 @@ namespace IbApiLibrary
                 orderId);
 
             return output;
+        }
+
+        public void ModifyLimitOrderPriceAndQuantity(int orderId, double newPrice, double newQuantity)
+        {
+            // get the existing order and only modify the pricing parameters, then resend
+            OrderModel order = _ibConnection._openOrders[orderId];
+
+            order.Order.TotalQuantity = newQuantity;
+            order.Order.LmtPrice = newPrice;
+
+            _clientSocket.placeOrder(orderId, order.Contract, order.Order);
+            _logger.Info("Modify LMT order for {Account}: Symbol={Symbol} Exchange={Exchange} Action={Action} Qty={Quantity} Price={LimitPrice} OrderId={OrderId}",
+                order.Order.Account,
+                order.Contract.Symbol,
+                order.Contract.Exchange,
+                order.Order.Action,
+                order.Order.TotalQuantity,
+                order.Order.LmtPrice,
+                orderId);
+
+            LastOrderSentTimestamp = GetUtcTimeStamp();
         }
 
         public int PlaceLimitOrder(IStockContractModel stockContract, string buyOrSell, double orderQuantity, double limitPrice, int ocaType = 2, string ocaGroupName = "")
@@ -311,7 +332,7 @@ namespace IbApiLibrary
             return -1;
         }
 
-        public async Task<int> CancelOrderByIdAsync(int orderId)
+        public async Task<int> CancelOrderByIdAsyncTask(int orderId)
         {
             _clientSocket.cancelOrder(orderId);
             var output = await WaitForOrderCancelAck(orderId);
@@ -335,6 +356,47 @@ namespace IbApiLibrary
             {
                 _ = await WaitForOrderCancelAck(canceledOrder);
                 _logger.Info("Canceled order {OrderId}", canceledOrder);
+            }
+        }
+
+        public void ExitAllPositions(int orderUpdateMilliseconds = 5000)
+        {
+            if (IsConnected)
+            {
+                bool havePositions = true;
+                Dictionary<int, int> placedOrders = new Dictionary<int, int>();
+
+                while (havePositions)
+                {
+                    havePositions = false;
+
+                    foreach (var stock in StockData)
+                    {
+                        if (stock.Value.Data.Position != 0)
+                        {
+                            havePositions = true;
+
+                            double quantity = Math.Abs(stock.Value.Data.Position);
+                            double price = (stock.Value.Data.BidPrice + stock.Value.Data.AskPrice) / 2;
+
+                            if (placedOrders.ContainsKey(stock.Key))
+                            {
+                                ModifyLimitOrderPriceAndQuantity(placedOrders[stock.Key], Math.Round(price, 2), Math.Round(quantity,0));
+                            }
+                            else
+                            {
+                                string buyOrSell = stock.Value.Data.Position > 0 ? "SELL" : "BUY";
+
+                                placedOrders.Add(stock.Key, PlaceLimitOrder(stock.Value.StockContract, buyOrSell, Math.Round(quantity, 0), Math.Round(price, 2)));
+                            }
+                        }
+                    }
+
+                    if (havePositions)
+                    {
+                        Thread.Sleep(orderUpdateMilliseconds);
+                    }
+                }
             }
         }
 
@@ -430,9 +492,8 @@ namespace IbApiLibrary
 
         public void RequestAccountUpdates()
         {
-            string accountNumber = _config.GetValue<string>("AccountNumber");
-            _clientSocket.reqAccountUpdates(true, accountNumber);
-            _logger.Debug("Requesting account updates for {Account}", accountNumber);
+            _clientSocket.reqAccountUpdates(true, _account);
+            _logger.Debug("Requesting account updates for {Account}", _account);
             while (_ibConnection.AccountDataFinishedDownloading is false) { }
         }
 

@@ -11,11 +11,11 @@ Uses **TWS API - Version 9.76.01 - CSharp** dll reference.
 Requires an appsettings.json file with IB connection settings:
 
 ```
-{
-    "IbPort": "your_port",
-    "IbConnectionId": "any_integer",
-    "AccountNumber": "your_account_id"
-}
+"IbSettings": {
+    "IbPort": "IbApiPort",
+    "IbConnectionId": "AnyInteger",
+    "AccountNumber": "IbAccountNumber"
+  }
 ```
 
 <img src="images/PositionViewer.PNG" alt="Position Viewer App" width="50%" />
